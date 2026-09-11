@@ -33,5 +33,24 @@ services:
       - ./db/migrations:/changelog
     command: update
 
+  analytics:
+    build:
+      context: ./analytics
+      dockerfile: Dockerfile
+    container_name: analytics
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5433
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=tender-hack
+    depends_on:
+      postgres:
+        condition: service_healthy
+      liquibase:
+        condition: service_completed_successfully
+
 volumes:
   postgres_data:
