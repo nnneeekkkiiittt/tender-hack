@@ -2,3 +2,7 @@ databaseChangeLog:
   - include:
       file: 001-init.sql
       relativeToChangelogFile: true
+    
+  - include:
+      file: 002-operator-field.sql
+      relativeToChangelogFile: true
