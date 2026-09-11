@@ -1,3 +1,3 @@
-module backend-for-analytics
+module analytics
 
 go 1.25.5

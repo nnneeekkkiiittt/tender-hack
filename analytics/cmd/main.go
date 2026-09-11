@@ -1,24 +1,18 @@
 package main
 
 import (
+	"analytics/handlers"
 	"log"
 	"net/http"
 	"time"
 )
 
-func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
 func main() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/api/v1/health-check", HealthCheck)
+	mux.HandleFunc("/api/v1/health-check", handlers.HealthCheck)
+
+	mux.HandleFunc("/api/v1/get-users-data", handlers.GetUsersData)
 
 	server := &http.Server{
 		Addr:         ":8080",
