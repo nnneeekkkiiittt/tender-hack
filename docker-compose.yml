@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tender-hack
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  liquibase:
+    image: liquibase/liquibase:latest
+    container_name: liquibase 
+    depends_on:
+      - postgres
+    volumes:
+      - ./db/migrations/changelog:/changelog
+    command:
+      - --changelog-file=/liquibase/changelog/changelog-master.yaml
+      - --url=jdbc:postgresql://postgres:5432/tender-hack
+      - --username=postgres
+      - --password=postgres
+      - update
+
+volumes:
+  postgres_data:
