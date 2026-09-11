@@ -1,3 +1,6 @@
+--liquibase formatted sql
+--changeset team:1
+
 CREATE TYPE user_role AS ENUM (
     'admin',
     'supportL1',
@@ -23,7 +26,7 @@ CREATE TYPE reason AS ENUM (
 CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    role role NOT NULL,
+    role user_role NOT NULL,
     hash VARCHAR(255) NOT NULL
 );
 
