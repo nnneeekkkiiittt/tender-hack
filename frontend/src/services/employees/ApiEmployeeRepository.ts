@@ -1,21 +1,29 @@
 import type { CreateEmployeePayload, EmployeeRepository } from './EmployeeRepository'
 import type { SupportEmployee } from '@/types'
-import { apiClient } from '@/api/client'
-
+import { api, type Page, type User } from '@/api/contracts'
+const adapt = (u: User): SupportEmployee => ({
+  id: u.id,
+  name: u.name,
+  email: '',
+  role: u.role as SupportEmployee['role'],
+})
 export class ApiEmployeeRepository implements EmployeeRepository {
-  async list(search?: string): Promise<SupportEmployee[]> {
-    return apiClient.get<SupportEmployee[]>('/employees', search ? { search } : undefined)
+  async listPage(search = '', offset = 0) {
+    const page = await api<Page<User>>('/employees', 'GET', undefined, { search, offset })
+    return { ...page, items: page.items.map(adapt) }
   }
-
-  async create(payload: CreateEmployeePayload): Promise<SupportEmployee> {
-    return apiClient.post<SupportEmployee>('/employees', payload)
+  async list(search?: string) {
+    return (await this.listPage(search)).items
   }
-
-  async update(id: string, patch: Partial<Pick<SupportEmployee, 'name' | 'email' | 'role'>>): Promise<SupportEmployee> {
-    return apiClient.patch<SupportEmployee>(`/employees/${id}`, patch)
+  async create(p: CreateEmployeePayload) {
+    return adapt(
+      await api<User>('/employees', 'POST', { name: p.name, role: p.role, password: p.password }),
+    )
   }
-
-  async toggleStatus(id: string): Promise<SupportEmployee> {
-    return apiClient.patch<SupportEmployee>(`/employees/${id}/toggle-status`, {})
+  async update(id: string, p: Partial<SupportEmployee>) {
+    return adapt(await api<User>('/employees/' + id, 'PATCH', { name: p.name, role: p.role }))
+  }
+  async toggleStatus(): Promise<SupportEmployee> {
+    throw new Error('Активация и деактивация недоступны')
   }
 }

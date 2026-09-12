@@ -6,6 +6,10 @@ import { DemoKnowledgeService } from './DemoKnowledgeService'
 // once the backend exposes a knowledge-base endpoint.
 export const knowledgeService: KnowledgeService = isDemoMode
   ? new DemoKnowledgeService()
-  : new DemoKnowledgeService()
+  : {
+      async list() {
+        throw new Error('База знаний пока недоступна')
+      },
+    }
 
 export type { KnowledgeService } from './KnowledgeService'

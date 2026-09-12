@@ -1,28 +1,34 @@
 import type { AuthService } from './AuthService'
 import type { AuthUser, LoginPayload, RegisterPayload } from '@/types'
-import { apiClient } from '@/api/client'
-
-// Placeholder for the real backend integration.
-// Swap DemoAuthService -> ApiAuthService in services/auth/index.ts once the
-// backend exists — no changes required in pages/components.
+import { api, type User } from '@/api/contracts'
+const adapt = (u: User): AuthUser => ({
+  id: u.id,
+  name: u.name,
+  email: '',
+  supportLevel: u.role.startsWith('supportL') ? Number(u.role.slice(-1)) : undefined,
+  role: u.role === 'admin' ? 'ADMIN' : u.role === 'user' ? 'USER' : 'SUPPORT',
+})
 export class ApiAuthService implements AuthService {
-  async getCurrentUser(): Promise<AuthUser | null> {
-    return apiClient.get<AuthUser | null>('/auth/me')
+  async getCurrentUser() {
+    const u = await api<User | null>('/auth/me')
+    return u ? adapt(u) : null
   }
-
-  async login(payload: LoginPayload): Promise<AuthUser> {
-    return apiClient.post<AuthUser>('/auth/login', payload)
+  async login(p: LoginPayload) {
+    return adapt(
+      await api<User>('/auth/login', 'POST', {
+        name: p.email,
+        password: p.password,
+        remember: p.remember,
+      }),
+    )
   }
-
+  async register(p: RegisterPayload) {
+    return adapt(await api<User>('/auth/register', 'POST', { name: p.name, password: p.password }))
+  }
+  async logout() {
+    await api('/auth/logout', 'POST', {})
+  }
   async loginWithGosuslugi(): Promise<AuthUser> {
-    return apiClient.post<AuthUser>('/auth/gosuslugi', {})
-  }
-
-  async register(payload: RegisterPayload): Promise<AuthUser> {
-    return apiClient.post<AuthUser>('/auth/register', payload)
-  }
-
-  async logout(): Promise<void> {
-    await apiClient.post('/auth/logout', {})
+    throw new Error('Вход через Госуслуги недоступен')
   }
 }

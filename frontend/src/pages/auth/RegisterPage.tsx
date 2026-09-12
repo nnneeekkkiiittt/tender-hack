@@ -1,3 +1,5 @@
+import { isDemoMode } from '@/config/env'
+import { ApiError } from '@/api/contracts'
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/layout/Logo'
@@ -39,13 +41,28 @@ export function RegisterPage() {
     e.preventDefault()
     setError(null)
 
-    if (!form.name || !form.organization || !form.inn || !form.email || !form.password) {
+    if (
+      !form.name ||
+      !form.password ||
+      (isDemoMode && (!form.organization || !form.inn || !form.email))
+    ) {
       setError('Заполните все обязательные поля')
       return
     }
     if (form.password !== form.confirmPassword) {
       setError('Пароли не совпадают')
       return
+    }
+    if (!isDemoMode) {
+      const name = form.name.trim()
+      if (Array.from(name).length < 3 || Array.from(name).length > 64 || !/^[\p{L}\p{N}_.-]+$/u.test(name)) {
+        setError('Имя пользователя: от 3 до 64 символов — буквы, цифры, точка, дефис или подчёркивание. Без пробелов и @.')
+        return
+      }
+      if (Array.from(form.password).length < 10 || Array.from(form.password).length > 128) {
+        setError('Пароль должен содержать от 10 до 128 символов.')
+        return
+      }
     }
     if (!agree) {
       setError('Необходимо принять пользовательское соглашение')
@@ -56,8 +73,18 @@ export function RegisterPage() {
     try {
       await register(form)
       navigate('/app')
-    } catch {
-      setError('Не удалось зарегистрироваться. Попробуйте снова.')
+    } catch (error) {
+      setError(
+        error instanceof ApiError
+          ? error.status === 409
+            ? 'Это имя пользователя уже занято. Выберите другое или войдите в существующий аккаунт.'
+            : error.status === 429
+              ? 'Слишком много попыток. Подождите минуту и повторите.'
+              : error.status === 422
+                ? 'Проверьте имя пользователя (3–64 символа, без пробелов и @) и пароль (10–128 символов).'
+                : 'Сервер не смог выполнить регистрацию. Попробуйте позже.'
+          : 'Не удалось связаться с сервером. Проверьте подключение и повторите.',
+      )
     } finally {
       setLoading(false)
     }
@@ -66,35 +93,60 @@ export function RegisterPage() {
   return (
     <div className="mx-auto w-full max-w-sm">
       <Logo />
-      <h1 className="mt-6 text-[28px] font-semibold leading-tight tracking-tight text-ink">Регистрация</h1>
+      <h1 className="mt-6 text-[28px] font-semibold leading-tight tracking-tight text-ink">
+        Регистрация
+      </h1>
       <p className="mt-2 text-[15px] leading-relaxed text-ink-muted">
-        Создайте аккаунт поставщика, чтобы участвовать в закупках
+        Создайте аккаунт для обращения в поддержку
       </p>
 
       <form onSubmit={handleSubmit} className="mt-7 space-y-4" noValidate>
-        <Input label="Имя" name="name" placeholder="Иван Иванов" value={form.name} onChange={setField('name')} />
         <Input
-          label="Название организации"
-          name="organization"
-          placeholder="ООО «Компания»"
-          value={form.organization}
-          onChange={setField('organization')}
+          label={isDemoMode ? 'Имя' : 'Имя пользователя'}
+          name="name"
+          placeholder={isDemoMode ? 'Иван Иванов' : 'Имя пользователя'}
+          value={form.name}
+          onChange={setField('name')}
         />
-        <Input label="ИНН" name="inn" placeholder="7701234567" value={form.inn} onChange={setField('inn')} />
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          placeholder="example@company.ru"
-          value={form.email}
-          onChange={setField('email')}
-          autoComplete="email"
-        />
+        {!isDemoMode && (
+          <p className="text-xs text-ink-muted">
+            3–64 символа: буквы, цифры, точка, дефис или подчёркивание. Не email; без пробелов и @.
+          </p>
+        )}
+        {isDemoMode && (
+          <>
+            <Input
+              label="Название организации"
+              name="organization"
+              placeholder="ООО «Компания»"
+              value={form.organization}
+              onChange={setField('organization')}
+            />
+            <Input
+              label="ИНН"
+              name="inn"
+              placeholder="7701234567"
+              value={form.inn}
+              onChange={setField('inn')}
+            />
+            <Input
+              label="Email"
+              type="email"
+              name="email"
+              placeholder="example@company.ru"
+              value={form.email}
+              onChange={setField('email')}
+              autoComplete="email"
+            />
+          </>
+        )}
         <Input
           label="Пароль"
           type="password"
           name="password"
-          placeholder="Не менее 8 символов"
+          minLength={10}
+          maxLength={128}
+          placeholder="От 10 до 128 символов"
           value={form.password}
           onChange={setField('password')}
           autoComplete="new-password"
@@ -119,7 +171,11 @@ export function RegisterPage() {
           Я принимаю пользовательское соглашение
         </label>
 
-        {error && <p className="text-sm text-accent">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-accent">
+            {error}
+          </p>
+        )}
 
         <Button type="submit" className="w-full" size="lg" loading={loading}>
           Зарегистрироваться

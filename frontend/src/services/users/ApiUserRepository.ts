@@ -1,13 +1,14 @@
 import type { UserRepository } from './UserRepository'
 import type { SupplierUser } from '@/types'
-import { apiClient } from '@/api/client'
-
+import { api, type Page, type User } from '@/api/contracts'
 export class ApiUserRepository implements UserRepository {
-  async list(search?: string): Promise<SupplierUser[]> {
-    return apiClient.get<SupplierUser[]>('/users', search ? { search } : undefined)
+  async listPage(search = '', offset = 0): Promise<Page<SupplierUser>> {
+    return api<Page<User>>('/users', 'GET', undefined, { search, offset })
   }
-
-  async getById(id: string): Promise<SupplierUser | null> {
-    return apiClient.get<SupplierUser | null>(`/users/${id}`)
+  async list(search?: string) {
+    return (await this.listPage(search)).items
+  }
+  async getById(): Promise<SupplierUser | null> {
+    throw new Error('Подробный профиль пользователя недоступен; используйте автора заявки')
   }
 }

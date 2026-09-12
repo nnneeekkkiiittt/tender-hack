@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import type { Ticket } from '@/types'
 import { TicketStatusBadge } from './TicketStatusBadge'
-import { formatDate } from '@/lib/utils'
+import { formatDate, TICKET_CATEGORY_LABEL } from '@/lib/utils'
 
 interface TicketCardProps {
   ticket: Ticket
@@ -21,7 +21,9 @@ export function TicketCard({ ticket, to }: TicketCardProps) {
           <span className="shrink-0 text-sm font-semibold text-primary">{ticket.number}</span>
           <span className="truncate text-[15px] font-medium text-ink">{ticket.title}</span>
         </div>
-        <p className="mt-1 truncate text-sm text-ink-muted">{ticket.description}</p>
+        <p className="mt-1 truncate text-sm text-ink-muted">
+          {ticket.description || TICKET_CATEGORY_LABEL[ticket.category]}
+        </p>
         <p className="mt-1.5 text-xs text-ink-muted">{formatDate(ticket.createdAt)}</p>
       </div>
       <div className="flex shrink-0 items-center gap-3">

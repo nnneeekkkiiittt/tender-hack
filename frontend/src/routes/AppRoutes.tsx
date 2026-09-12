@@ -1,3 +1,5 @@
+import { isDemoMode } from '@/config/env'
+import { UnavailableState } from '@/components/ui/UnavailableState'
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from './ProtectedRoute'
@@ -54,6 +56,7 @@ export function AppRoutes() {
         <Route element={<UserLayout />}>
           <Route path="/app" element={<UserHomePage />} />
           <Route path="/tickets" element={<UserTicketsPage />} />
+          <Route path="/tickets/new" element={<Navigate to="/app" replace />} />
           <Route path="/tickets/:id" element={<UserTicketDetailPage />} />
         </Route>
       </Route>
@@ -63,9 +66,14 @@ export function AppRoutes() {
         <Route element={<SupportLayout />}>
           <Route path="/support" element={<SupportDashboardPage mode="all" />} />
           <Route path="/support/tickets" element={<SupportDashboardPage mode="all" />} />
-          <Route path="/support/mine" element={<SupportDashboardPage mode="mine" />} />
-          <Route path="/support/control" element={<SupportDashboardPage mode="control" />} />
-          <Route path="/support/stats" element={<SupportStatsPage />} />
+          <Route path="/support/mine" element={<SupportDashboardPage key="mine" mode="mine" />} />
+          {isDemoMode && (
+            <Route path="/support/control" element={<SupportDashboardPage mode="control" />} />
+          )}
+          <Route
+            path="/support/stats"
+            element={isDemoMode ? <SupportStatsPage /> : <UnavailableState title="Статистика" />}
+          />
           <Route path="/support/tickets/:id" element={<SupportTicketDetailPage />} />
         </Route>
       </Route>
@@ -73,12 +81,20 @@ export function AppRoutes() {
       {/* ADMIN */}
       <Route element={<ProtectedRoute allow={['ADMIN']} />}>
         <Route element={<AdminLayout />}>
-          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route
+            path="/admin"
+            element={
+              isDemoMode ? <AdminDashboardPage /> : <UnavailableState title="Общая статистика" />
+            }
+          />
           <Route path="/admin/tickets" element={<AdminTicketsPage />} />
           <Route path="/admin/tickets/:id" element={<AdminTicketDetailPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/employees" element={<AdminEmployeesPage />} />
-          <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+          <Route
+            path="/admin/analytics"
+            element={isDemoMode ? <AdminAnalyticsPage /> : <UnavailableState title="Аналитика" />}
+          />
           <Route path="/admin/settings" element={<AdminSettingsPage />} />
         </Route>
       </Route>

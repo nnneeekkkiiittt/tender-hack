@@ -1,9 +1,2 @@
-import { isDemoMode } from '@/config/env'
-import type { AiService } from './AiService'
-import { DemoAiService } from './DemoAiService'
-
-// The real backend will likely expose this as a streaming endpoint;
-// the interface stays the same, only the implementation changes.
-export const aiService: AiService = isDemoMode ? new DemoAiService() : new DemoAiService()
-
+// AI is called by the backend when the claim starts, never as a separate UI flow.
 export type { AiService, AskResult } from './AiService'

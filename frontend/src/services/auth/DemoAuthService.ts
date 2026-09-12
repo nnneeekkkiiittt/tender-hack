@@ -1,5 +1,5 @@
 import type { AuthService } from './AuthService'
-import type { AuthUser, LoginPayload, RegisterPayload, UserRole } from '@/types'
+import type { AuthUser, RegisterPayload, UserRole } from '@/types'
 import { DEMO_USERS } from '@/mock/auth.mock'
 import { demoStorage, DEMO_STORAGE_KEYS } from '@/lib/storage'
 
@@ -16,7 +16,7 @@ export class DemoAuthService implements AuthService {
     return DEMO_USERS[role]
   }
 
-  async login(_payload: LoginPayload): Promise<AuthUser> {
+  async login(): Promise<AuthUser> {
     await wait(DELAY)
     // In demo mode, any credentials land the visitor on the demo role selector.
     // We default to the USER role so the primary flow (ask → ticket) is reachable immediately.

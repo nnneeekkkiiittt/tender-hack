@@ -1,3 +1,4 @@
+import { isDemoMode } from '@/config/env'
 import React from 'react'
 import { Link } from 'react-router-dom'
 import type { Ticket } from '@/types'
@@ -21,7 +22,7 @@ export function TicketTable({ tickets, basePath, showUser = true }: TicketTableP
             <th className="px-4 py-3 font-medium">Тема</th>
             {showUser && <th className="px-4 py-3 font-medium">Пользователь</th>}
             <th className="px-4 py-3 font-medium">Статус</th>
-            <th className="px-4 py-3 font-medium">Приоритет</th>
+            {isDemoMode && <th className="px-4 py-3 font-medium">Приоритет</th>}
             <th className="px-4 py-3 font-medium">Обновлено</th>
           </tr>
         </thead>
@@ -32,25 +33,37 @@ export function TicketTable({ tickets, basePath, showUser = true }: TicketTableP
               className="cursor-pointer border-b border-border last:border-0 hover:bg-gray-50/70"
             >
               <td className="px-4 py-3.5 align-middle">
-                <Link to={`${basePath}/${ticket.id}`} className="font-medium text-primary hover:underline">
+                <Link
+                  to={`${basePath}/${ticket.id}`}
+                  className="font-medium text-primary hover:underline"
+                >
                   {ticket.number}
                 </Link>
               </td>
               <td className="px-4 py-3.5 align-middle">
-                <Link to={`${basePath}/${ticket.id}`} className="block max-w-xs truncate text-ink hover:text-primary">
+                <Link
+                  to={`${basePath}/${ticket.id}`}
+                  className="block max-w-xs truncate text-ink hover:text-primary"
+                >
                   {ticket.title}
                 </Link>
               </td>
               {showUser && (
-                <td className="px-4 py-3.5 align-middle text-ink-muted">{ticket.userOrganization}</td>
+                <td className="px-4 py-3.5 align-middle text-ink-muted">
+                  {ticket.userOrganization || ticket.userName}
+                </td>
               )}
               <td className="px-4 py-3.5 align-middle">
                 <TicketStatusBadge status={ticket.status} />
               </td>
-              <td className="px-4 py-3.5 align-middle">
-                <PriorityBadge priority={ticket.priority} />
+              {isDemoMode && ticket.priority && (
+                <td className="px-4 py-3.5 align-middle">
+                  <PriorityBadge priority={ticket.priority} />
+                </td>
+              )}
+              <td className="px-4 py-3.5 align-middle text-ink-muted">
+                {formatDate(ticket.updatedAt)}
               </td>
-              <td className="px-4 py-3.5 align-middle text-ink-muted">{formatDate(ticket.updatedAt)}</td>
             </tr>
           ))}
         </tbody>

@@ -11,6 +11,7 @@ export interface AuthUser {
   name: string
   email: string
   role: UserRole
+  supportLevel?: number
   organization?: string
   inn?: string
   avatarUrl?: string
@@ -19,16 +20,16 @@ export interface AuthUser {
 export interface SupplierUser {
   id: string
   name: string
-  organization: string
-  inn: string
-  email: string
+  organization?: string
+  inn?: string
+  email?: string
   phone?: string
-  ticketsCount: number
-  lastActivity: string // ISO date
-  status: UserStatus
+  ticketsCount?: number
+  lastActivity?: string // ISO date
+  status?: UserStatus
 }
 
-export type EmployeeRole = 'EMPLOYEE' | 'SENIOR_EMPLOYEE'
+export type EmployeeRole = 'EMPLOYEE' | 'SENIOR_EMPLOYEE' | 'supportL1' | 'supportL2' | 'supportL3'
 export type EmployeeStatus = 'ACTIVE' | 'INACTIVE'
 
 export interface SupportEmployee {
@@ -36,12 +37,18 @@ export interface SupportEmployee {
   name: string
   email: string
   role: EmployeeRole
-  status: EmployeeStatus
-  lastLogin: string // ISO date
-  activeTickets: number
+  status?: EmployeeStatus
+  lastLogin?: string // ISO date
+  activeTickets?: number
 }
 
-export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_REPLY' | 'RESOLVED' | 'CLOSED'
+export type TicketStatus =
+  | 'OPEN'
+  | 'IN_PROGRESS'
+  | 'WAITING_REPLY'
+  | 'RESOLVED'
+  | 'CLOSED'
+  | 'CANCELLED'
 
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
@@ -53,7 +60,7 @@ export type TicketCategory =
   | 'CONTRACT'
   | 'OTHER'
 
-export type MessageAuthorRole = 'USER' | 'AI' | 'SUPPORT'
+export type MessageAuthorRole = 'USER' | 'AI' | 'SUPPORT' | 'ADMIN' | 'SYSTEM'
 
 export interface MessageAttachment {
   id: string
@@ -71,6 +78,11 @@ export interface TicketMessage {
   createdAt: string // ISO date
   attachments?: MessageAttachment[]
   isAiAnalysis?: boolean
+  sources?: string[]
+  disliked?: boolean
+  liked?: boolean
+  reaction?: { like: boolean; reasons: string[] } | null
+  mlContext?: import('@/api/contracts').MlContext | null
 }
 
 export interface Ticket {
@@ -79,17 +91,20 @@ export interface Ticket {
   title: string
   description: string
   status: TicketStatus
-  priority: TicketPriority
+  priority?: TicketPriority
   category: TicketCategory
   userId: string
   userName: string
-  userOrganization: string
+  userOrganization?: string
   supportId?: string
   supportName?: string
   createdAt: string // ISO date
   updatedAt: string // ISO date
   messages: TicketMessage[]
+  subtopic?: string
+  nextBefore?: string | null
   aiHelped?: boolean
+  handlingLevel?: number
 }
 
 // ============ Analytics ============
@@ -304,4 +319,8 @@ export interface TicketFilters {
   search?: string
   ownerId?: string
   onlyControl?: boolean
+  category?: TicketCategory
+  unassigned?: boolean
+  offset?: number
+  limit?: number
 }

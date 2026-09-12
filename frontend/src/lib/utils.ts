@@ -36,6 +36,7 @@ export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
   WAITING_REPLY: 'Ожидает ответа',
   RESOLVED: 'Решена',
   CLOSED: 'Закрыта',
+  CANCELLED: 'Отменена',
 }
 
 export const TICKET_PRIORITY_LABEL: Record<TicketPriority, string> = {

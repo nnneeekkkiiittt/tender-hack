@@ -23,7 +23,7 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     if (!email || !password) {
-      setError('Заполните email и пароль')
+      setError('Заполните имя пользователя и пароль')
       return
     }
     setLoading(true)
@@ -56,7 +56,9 @@ export function LoginPage() {
         </span>
       )}
 
-      <h1 className="mt-6 text-[28px] font-semibold leading-tight tracking-tight text-ink">Вход в систему</h1>
+      <h1 className="mt-6 text-[28px] font-semibold leading-tight tracking-tight text-ink">
+        Вход в систему
+      </h1>
       <p className="mt-2 text-[15px] leading-relaxed text-ink-muted">
         Единая платформа для работы
         <br />с закупками города Москвы
@@ -64,13 +66,13 @@ export function LoginPage() {
 
       <form onSubmit={handleSubmit} className="mt-7 space-y-4" noValidate>
         <Input
-          label="Электронная почта"
-          type="email"
+          label={isDemoMode ? 'Электронная почта' : 'Имя пользователя'}
+          type={isDemoMode ? 'email' : 'text'}
           name="email"
-          placeholder="example@company.ru"
+          placeholder={isDemoMode ? 'example@company.ru' : 'Имя пользователя'}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
+          autoComplete="username"
         />
         <Input
           label="Пароль"
@@ -87,12 +89,20 @@ export function LoginPage() {
               className="text-ink-muted hover:text-ink"
               aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
             >
-              {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+              {showPassword ? (
+                <EyeOff className="h-[18px] w-[18px]" />
+              ) : (
+                <Eye className="h-[18px] w-[18px]" />
+              )}
             </button>
           }
         />
 
-        {error && <p className="text-sm text-accent">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-accent">
+            {error}
+          </p>
+        )}
 
         <div className="flex items-center justify-between pt-1">
           <label className="flex items-center gap-2 text-sm text-ink">
@@ -104,9 +114,12 @@ export function LoginPage() {
             />
             Запомнить меня
           </label>
-          <Link to="#" className="text-sm font-medium text-primary hover:underline">
-            Забыли пароль?
-          </Link>
+          <span
+            title="Для сброса пароля обратитесь к администратору"
+            className="text-sm text-ink-muted"
+          >
+            Сброс через администратора
+          </span>
         </div>
 
         <Button type="submit" className="w-full" size="lg" loading={loading}>
@@ -114,15 +127,26 @@ export function LoginPage() {
         </Button>
       </form>
 
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs font-medium text-ink-muted">ИЛИ</span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
+      {isDemoMode && (
+        <>
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-medium text-ink-muted">ИЛИ</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
 
-      <Button variant="outline" size="lg" className="w-full" leftIcon={<Landmark className="h-4 w-4" />} onClick={handleGosuslugi} disabled={loading}>
-        Войти через Госуслуги
-      </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            leftIcon={<Landmark className="h-4 w-4" />}
+            onClick={handleGosuslugi}
+            disabled={loading}
+          >
+            Войти через Госуслуги
+          </Button>
+        </>
+      )}
 
       <p className="mt-6 text-center text-sm text-ink-muted">
         Нет аккаунта?{' '}

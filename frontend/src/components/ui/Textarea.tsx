@@ -8,7 +8,8 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ label, error, className, id, ...props }, ref) => {
-    const areaId = id ?? props.name
+    const generatedId = React.useId()
+    const areaId = id ?? props.name ?? generatedId
     return (
       <div className="w-full">
         {label && (
@@ -23,7 +24,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             'w-full resize-none rounded-md border border-border bg-white px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-muted',
             'transition-colors focus:border-primary-light focus:outline-none focus:ring-2 focus:ring-primary-light/20',
             error && 'border-accent focus:border-accent focus:ring-accent/20',
-            className
+            className,
           )}
           aria-invalid={!!error}
           {...props}
@@ -31,6 +32,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {error && <p className="mt-1.5 text-sm text-accent">{error}</p>}
       </div>
     )
-  }
+  },
 )
 Textarea.displayName = 'Textarea'

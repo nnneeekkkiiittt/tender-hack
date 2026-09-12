@@ -2,6 +2,7 @@ import type { TicketRepository, CreateTicketPayload, SendMessagePayload } from '
 import type { Ticket, TicketFilters, TicketMessage, TicketPriority, TicketStatus } from '@/types'
 import { INITIAL_TICKETS } from '@/mock/tickets.mock'
 import { demoStorage, DEMO_STORAGE_KEYS } from '@/lib/storage'
+import { DemoAiService } from '@/services/ai/DemoAiService'
 import { generateId } from '@/lib/utils'
 
 const DELAY = 300
@@ -32,7 +33,9 @@ function applyFilters(tickets: Ticket[], filters?: TicketFilters): Ticket[] {
     result = result.filter((t) => t.supportId === filters.ownerId)
   }
   if (filters?.onlyControl) {
-    result = result.filter((t) => t.priority === 'HIGH' && t.status !== 'RESOLVED' && t.status !== 'CLOSED')
+    result = result.filter(
+      (t) => t.priority === 'HIGH' && t.status !== 'RESOLVED' && t.status !== 'CLOSED',
+    )
   }
   if (filters?.search) {
     const q = filters.search.trim().toLowerCase()
@@ -41,10 +44,12 @@ function applyFilters(tickets: Ticket[], filters?: TicketFilters): Ticket[] {
         t.title.toLowerCase().includes(q) ||
         t.number.toLowerCase().includes(q) ||
         t.userName.toLowerCase().includes(q) ||
-        t.userOrganization.toLowerCase().includes(q)
+        (t.userOrganization || '').toLowerCase().includes(q),
     )
   }
-  return [...result].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  return [...result].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  )
 }
 
 export class DemoTicketRepository implements TicketRepository {
@@ -71,7 +76,11 @@ export class DemoTicketRepository implements TicketRepository {
     // Explicit annotation gives the object literal below a contextual type,
     // so `authorRole` is checked against MessageAuthorRole directly instead
     // of widening to `string` (which `as const` on a ternary does not fix).
-    const messages: TicketMessage[] = (payload.originMessages ?? []).map((m) => ({
+    const answer = await new DemoAiService().ask(payload.text)
+    const messages: TicketMessage[] = [
+      { role: 'user', content: payload.text },
+      { role: 'assistant', content: answer.answer },
+    ].map((m) => ({
       id: generateId('msg'),
       ticketId: '',
       authorId: m.role === 'user' ? payload.userId : 'ai',
@@ -84,8 +93,9 @@ export class DemoTicketRepository implements TicketRepository {
     const ticket: Ticket = {
       id: generateId('tkt'),
       number: nextTicketNumber(tickets),
-      title: payload.title,
-      description: payload.description,
+      title: payload.text.slice(0, 255),
+      handlingLevel: 0,
+      description: payload.text,
       status: 'OPEN',
       priority: 'MEDIUM',
       category: payload.category,
@@ -103,6 +113,34 @@ export class DemoTicketRepository implements TicketRepository {
     return ticket
   }
 
+  async reactToAi(
+    id: string,
+    messageId: string,
+    body: { like: boolean; reasons: string[] },
+  ): Promise<void> {
+    const tickets = loadAll(),
+      ticket = tickets.find((t) => t.id === id)
+    if (!ticket) throw new Error('Ticket not found')
+    const message = ticket.messages.find((m) => m.id === messageId && m.authorRole === 'AI')
+    if (!message) throw new Error('AI answer not found')
+    message.disliked = !body.like
+    message.liked = body.like
+    message.reaction = body
+    if (!body.like && ticket.handlingLevel === 0) ticket.handlingLevel = 1
+    saveAll(tickets)
+  }
+  async escalate(id: string, expectedLevel: number): Promise<Ticket> {
+    const tickets = loadAll(),
+      ticket = tickets.find((t) => t.id === id)
+    if (!ticket || ticket.handlingLevel !== expectedLevel || expectedLevel >= 3)
+      throw new Error('Invalid escalation')
+    ticket.handlingLevel++
+    ticket.supportId = undefined
+    ticket.supportName = undefined
+    ticket.status = 'OPEN'
+    saveAll(tickets)
+    return ticket
+  }
   async sendMessage(payload: SendMessagePayload): Promise<Ticket> {
     await wait(250)
     const tickets = loadAll()
@@ -122,9 +160,16 @@ export class DemoTicketRepository implements TicketRepository {
     const nowIso = new Date().toISOString()
     const updatedTicket: Ticket = {
       ...tickets[idx],
+      handlingLevel:
+        payload.authorRole === 'USER' && tickets[idx].handlingLevel === 0
+          ? 1
+          : tickets[idx].handlingLevel,
       messages: [...tickets[idx].messages, message],
       updatedAt: nowIso,
-      status: payload.authorRole === 'SUPPORT' && tickets[idx].status === 'OPEN' ? 'IN_PROGRESS' : tickets[idx].status,
+      status:
+        payload.authorRole === 'SUPPORT' && tickets[idx].status === 'OPEN'
+          ? 'IN_PROGRESS'
+          : tickets[idx].status,
     }
 
     tickets[idx] = updatedTicket

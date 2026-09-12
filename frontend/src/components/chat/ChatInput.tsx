@@ -1,3 +1,4 @@
+import { isDemoMode } from '@/config/env'
 import React, { useState, useRef } from 'react'
 import { Plus, ArrowUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -9,7 +10,12 @@ interface ChatInputProps {
   autoFocus?: boolean
 }
 
-export function ChatInput({ onSend, disabled, placeholder = 'Спросите что угодно...', autoFocus }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  disabled,
+  placeholder = 'Спросите что угодно...',
+  autoFocus,
+}: ChatInputProps) {
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -41,11 +47,15 @@ export function ChatInput({ onSend, disabled, placeholder = 'Спросите ч
         type="button"
         className="mb-0.5 shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-gray-100"
         aria-label="Добавить вложение"
+        disabled={!isDemoMode}
+        title="Вложения пока недоступны"
       >
         <Plus className="h-5 w-5" />
       </button>
       <textarea
         ref={textareaRef}
+        aria-label={placeholder === 'Спросите что угодно...' ? 'Ваш вопрос' : 'Сообщение'}
+        maxLength={10000}
         rows={1}
         value={value}
         onChange={handleChange}
@@ -61,7 +71,9 @@ export function ChatInput({ onSend, disabled, placeholder = 'Спросите ч
         disabled={!value.trim() || disabled}
         className={cn(
           'mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors',
-          value.trim() && !disabled ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-gray-100 text-ink-muted'
+          value.trim() && !disabled
+            ? 'bg-primary text-white hover:bg-primary-dark'
+            : 'bg-gray-100 text-ink-muted',
         )}
         aria-label="Отправить"
       >

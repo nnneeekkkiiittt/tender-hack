@@ -1,4 +1,9 @@
-import React from 'react'
+import { isDemoMode } from '@/config/env'
+import { TicketActions } from '@/components/tickets/TicketActions'
+import { OlderMessages } from '@/components/tickets/OlderMessages'
+import React, { useState } from 'react'
+import { useAuthStore } from '@/store/authStore'
+import { ChatInput } from '@/components/chat/ChatInput'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Sparkles } from 'lucide-react'
@@ -11,12 +16,21 @@ import { ticketRepository } from '@/services/tickets'
 import { formatDate, formatShortDate, TICKET_CATEGORY_LABEL, cn } from '@/lib/utils'
 
 export function AdminTicketDetailPage() {
+  const user = useAuthStore((s) => s.user)!
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState('')
   const { id } = useParams<{ id: string }>()
 
-  const { data: ticket, isLoading, isError, refetch } = useQuery({
+  const {
+    data: ticket,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['ticket', id],
     queryFn: () => ticketRepository.getById(id!),
     enabled: !!id,
+    refetchInterval: 5000,
   })
 
   if (isLoading) return <LoadingState label="Загрузка заявки..." />
@@ -24,7 +38,10 @@ export function AdminTicketDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-      <Link to="/admin/tickets" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink">
+      <Link
+        to="/admin/tickets"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
+      >
         <ArrowLeft className="h-4 w-4" />К списку заявок
       </Link>
 
@@ -32,12 +49,13 @@ export function AdminTicketDetailPage() {
         <h1 className="text-xl font-semibold text-ink">
           <span className="text-primary">{ticket.number}</span> {ticket.title}
         </h1>
-        <PriorityBadge priority={ticket.priority} withLabelPrefix />
+        {ticket.priority && <PriorityBadge priority={ticket.priority} withLabelPrefix />}
         <TicketStatusBadge status={ticket.status} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
         <div className="space-y-5 rounded-lg border border-border bg-white p-5">
+          {!isDemoMode && <OlderMessages ticket={ticket} />}
           {ticket.messages.map((message) => {
             const isAi = message.authorRole === 'AI'
             return (
@@ -47,21 +65,65 @@ export function AdminTicketDetailPage() {
                     <Sparkles className="h-4 w-4" />
                   </span>
                 ) : (
-                  <Avatar name={message.authorName} size="sm" tone={message.authorRole === 'SUPPORT' ? 'accent' : 'primary'} />
+                  <Avatar
+                    name={message.authorName}
+                    size="sm"
+                    tone={message.authorRole === 'SUPPORT' ? 'accent' : 'primary'}
+                  />
                 )}
                 <div className="max-w-[85%]">
                   <div className="mb-1 flex items-center gap-2 text-xs text-ink-muted">
-                    <span className="font-medium text-ink">{isAi ? 'AI-ассистент' : message.authorName}</span>
+                    <span className="font-medium text-ink">
+                      {isAi ? 'AI-ассистент' : message.authorName}
+                    </span>
                     <span>{formatDate(message.createdAt)}</span>
                   </div>
-                  <div className={cn('inline-block whitespace-pre-wrap rounded-lg px-3.5 py-2.5 text-[15px] leading-relaxed', isAi ? 'bg-primary/5 text-ink' : 'bg-gray-100 text-ink')}>
+                  <div
+                    className={cn(
+                      'inline-block whitespace-pre-wrap break-words rounded-lg px-3.5 py-2.5 text-[15px] leading-relaxed',
+                      isAi ? 'bg-primary/5 text-ink' : 'bg-gray-100 text-ink',
+                    )}
+                  >
                     {message.content}
                   </div>
                 </div>
               </div>
             )
           })}
-          {ticket.messages.length === 0 && <p className="text-sm text-ink-muted">Сообщений пока нет.</p>}
+          {!isDemoMode &&
+            (ticket.handlingLevel ?? 1) > 0 &&
+            (ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') && (
+              <ChatInput
+                placeholder="Написать ответ пользователю..."
+                disabled={busy}
+                onSend={async (text) => {
+                  setBusy(true)
+                  setError('')
+                  try {
+                    await ticketRepository.sendMessage({
+                      ticketId: ticket.id,
+                      authorId: user.id,
+                      authorName: user.name,
+                      authorRole: 'ADMIN',
+                      content: text,
+                    })
+                    await refetch()
+                  } catch (e) {
+                    setError((e as Error).message)
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              />
+            )}
+          {error && (
+            <p role="alert" className="text-sm text-accent">
+              {error}
+            </p>
+          )}
+          {ticket.messages.length === 0 && (
+            <p className="text-sm text-ink-muted">Сообщений пока нет.</p>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -72,8 +134,14 @@ export function AdminTicketDetailPage() {
               <Row label="Создана" value={formatShortDate(ticket.createdAt)} />
               <Row label="Обновлена" value={formatShortDate(ticket.updatedAt)} />
               <Row label="Сотрудник" value={ticket.supportName ?? '—'} />
+              {ticket.subtopic && <Row label="Подкатегория" value={ticket.subtopic} />}
             </div>
           </div>
+          {!isDemoMode && (
+            <div className="rounded-lg border border-border bg-white p-5">
+              <TicketActions key={ticket.supportId} ticket={ticket} />
+            </div>
+          )}
           <div className="rounded-lg border border-border bg-white p-5 text-sm">
             <h2 className="text-sm font-semibold text-ink">Пользователь</h2>
             <p className="mt-2 font-medium text-ink">{ticket.userOrganization}</p>

@@ -10,7 +10,10 @@ export class DemoUserRepository implements UserRepository {
     if (!search) return INITIAL_USERS
     const q = search.toLowerCase()
     return INITIAL_USERS.filter(
-      (u) => u.name.toLowerCase().includes(q) || u.organization.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+      (u) =>
+        u.name.toLowerCase().includes(q) ||
+        (u.organization || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q),
     )
   }
 

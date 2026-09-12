@@ -37,13 +37,21 @@ export function UserLayout() {
           },
         ]}
         topSlot={
-          <Button variant="secondary" size="md" className="w-full" leftIcon={<Plus className="h-4 w-4" />} onClick={handleNewQuestion}>
+          <Button
+            variant="secondary"
+            size="md"
+            className="w-full"
+            leftIcon={<Plus className="h-4 w-4" />}
+            onClick={handleNewQuestion}
+          >
             Новый вопрос
           </Button>
         }
       >
         <div className="mt-5">
-          <p className="mb-1.5 px-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Недавнее</p>
+          <p className="mb-1.5 px-3 text-xs font-medium uppercase tracking-wide text-ink-muted">
+            Примеры вопросов
+          </p>
           <div className="space-y-0.5">
             {RECENT_QUESTIONS.map((q) => (
               <button
@@ -59,7 +67,7 @@ export function UserLayout() {
         </div>
       </Sidebar>
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Header />
         <main className="flex-1">
           <Outlet />

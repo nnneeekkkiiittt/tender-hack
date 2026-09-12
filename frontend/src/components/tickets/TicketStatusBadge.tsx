@@ -9,6 +9,7 @@ const TONE: Record<TicketStatus, 'info' | 'warning' | 'success' | 'neutral' | 'd
   WAITING_REPLY: 'warning',
   RESOLVED: 'success',
   CLOSED: 'neutral',
+  CANCELLED: 'neutral',
 }
 
 export function TicketStatusBadge({ status }: { status: TicketStatus }) {
