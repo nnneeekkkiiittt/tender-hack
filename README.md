@@ -52,8 +52,15 @@ a production-safe configuration. The public server's settings and passwords are
 not part of this repository. Statistics remain a separate optional service.
 
 Assets, reproducibility and licenses: [assets/README.md](assets/README.md).
-Fresh-clone browser acceptance: `E2E_DEMO=true E2E_BASE_URL=http://localhost:8080
-npm --prefix frontend run test:e2e -- demo.spec.ts` (install Chromium first).
+Fresh-clone browser acceptance (install Chromium first):
+
+```sh
+E2E_DEMO=true E2E_REAL_ML=true E2E_BASE_URL=http://localhost:8080 \
+  npm --prefix frontend run test:e2e -- demo.spec.ts
+```
+
+Omit `E2E_REAL_ML=true` when testing `--mock`. If running browser suites in
+parallel, give each a separate `--output` directory to avoid trace-file collisions.
 
 ## Manual developer setup
 
