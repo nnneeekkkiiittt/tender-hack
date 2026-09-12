@@ -1,6 +1,6 @@
 """
 Модуль классификации интентов и маршрутизации обращений (Router).
-Определяет целевую линию поддержки (L1, L2, L3, OUT_OF_SCOPE) через Qwen 2.5 7B.
+Определяет целевую линию поддержки (L1, L2, L3, OUT_OF_SCOPE) через LLM.
 """
 
 import json
@@ -20,32 +20,36 @@ ROUTER_SYSTEM_PROMPT = """Ты — интеллектуальный диспет
 
 1. "OUT_OF_SCOPE": Вопрос не относится к закупкам, регламентам, ИТ или поддержке (быт, кулинария, погода, спам, оффтоп).
 2. "L1": Простые типовые вопросы (восстановление пароля, регистрация, вход, где скачать форму, базовая навигация в личном кабинете).
-3. "L2": Методология, нормативные регламенты, ГОСТы, ФЗ о закупках, требования к СКЗИ/АРМ, сроки процедур. Требует базы знаний.
-4. "L3": Программные инциденты и технические ошибки (код 500, Database Error, белый экран, ошибки ЭЦП, падение сервиса). Требует прямой передачи разработчикам без поиска в БЗ.
+3. "L2": Предметные вопросы, регламенты, закупки, документы и ЛЮБЫЕ ОШИБКИ ИНТЕРФЕЙСА:
+   - Методология, нормативные регламенты, 44-ФЗ, 223-ФЗ, ГОСТы, сроки;
+   - Заполнение документов, контракты, оферты, акты, спецификации, СТЕ, МЧД;
+   - Настройка СКЗИ, плагина КриптоПро, сертификатов и ЭЦП;
+   - ЛЮБЫЕ функциональные сообщения об ошибках, коды ошибок валидации (например, "ошибка РДИК", "РДИК_0217", ошибка при сохранении или подписании). Требует поиска в регламентах или оператора L2!
+4. "L3": ИСКЛЮЧИТЕЛЬНО глобальные аппаратные сбои инфраструктуры (HTTP 500 Internal Server Error, падение базы данных, падение всего сервиса).
+
+СТРОГИЕ ПРАВИЛА:
+- Любые ошибки в документах, офертах, ЭЦП, коды ошибок вида "РДИК_..." относятся СТРОГО к L2! Запрещено слать их на L3.
+- L3 выбирается ТОЛЬКО при отказе серверной инфраструктуры (код 500, упал сервер).
+
+ПРИМЕРЫ:
+- "ошибка РДИК_0217" -> {"line": "L2", "topic": "Ошибка РДИК"}
+- "Не работает электронная подпись при подписании оферты" -> {"line": "L2", "topic": "Ошибка ЭЦП"}
+- "Как сбросить пароль от личного кабинета?" -> {"line": "L1", "topic": "Сброс пароля"}
+- "HTTP 500 Internal Server Error" -> {"line": "L3", "topic": "Сбой сервера"}
+- "Как приготовить шарлотку с яблоками?" -> {"line": "OUT_OF_SCOPE", "topic": "Не по теме"}
 
 ОТВЕТ ДОЛЖЕН БЫТЬ СТРОГО В ФОРМАТЕ JSON:
-{
-  "line": "L1" | "L2" | "L3" | "OUT_OF_SCOPE",
-  "confidence": число от 0.0 до 1.0,
-  "topic": "краткое наименование темы",
-  "subtopic": "подтема или null",
-  "reasoning": "краткое объяснение в 1 предложение",
-  "needs_rag": true для L1 и L2, false для L3 и OUT_OF_SCOPE
-}
-Не пиши ничего, кроме валидного JSON!
-
-ВАЖНО: выбирай L3 только если пользователь сообщает о конкретном программном сбое, сообщении об ошибке или неработоспособности системы. Не придумывай инцидент по названию темы. Вопросы «как» или «где» выполнить штатное действие (в том числе загрузить документ/МЧД или использовать электронную подпись) без сообщения о сбое относятся к L1 и требуют поиска инструкции. Нормативные требования к этим действиям относятся к L2. Техническая терминология сама по себе не основание для L3.
-"""
+{"line": "L1" | "L2" | "L3" | "OUT_OF_SCOPE", "topic": "краткая тема (2-3 слова)"}"""
 
 
 class IntentRouter:
-    """Классификатор обращений на базе Qwen 2.5 7B с сохранением сессии."""
+    """Классификатор обращений на базе LLM с минимальным latency и защитой."""
 
     def __init__(
         self,
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
-        timeout: float = 60.0,
+        timeout: float = 30.0,
     ):
         self.base_url = (base_url or settings.VLLM_BASE_URL).rstrip("/")
         self.model_name = model_name or settings.MODEL_NAME
@@ -78,7 +82,7 @@ class IntentRouter:
             "model": self.model_name,
             "messages": messages,
             "temperature": settings.ROUTER_TEMPERATURE,
-            "max_tokens": 250,
+            "max_tokens": 50,
             "response_format": {"type": "json_object"},
         }
 
@@ -89,12 +93,14 @@ class IntentRouter:
             data = response.json()
             content = data["choices"][0]["message"]["content"].strip()
 
-            if content.startswith('```'):
-                content = re.sub(r'^```(?:json)?\s*', '', content)
-                content = re.sub(r'\s*```$', '', content)
+            # Очистка markdown fences, если модель вернула код-блок
+            if content.startswith("```"):
+                content = re.sub(r"^```(?:json)?\s*", "", content)
+                content = re.sub(r"\s*```$", "", content)
+
             parsed = json.loads(content)
 
-            # Валидация линии через enum без приватных атрибутов
+            # Валидация линии через enum
             raw_line = str(parsed.get("line", "L1")).upper().strip()
             try:
                 line_enum = SupportLine(raw_line)
@@ -102,11 +108,24 @@ class IntentRouter:
                 logger.warning(f"Неизвестная линия поддержки '{raw_line}', fallback на L1")
                 line_enum = SupportLine.L1
 
+            # Защита от ложного L3: ошибки РДИК, оферт, ЭЦП, валидации — всегда L2
+            q_lower = query.lower()
+            if line_enum == SupportLine.L3 and (
+                "рдик" in q_lower
+                or "оферт" in q_lower
+                or "сте" in q_lower
+                or "эцп" in q_lower
+                or "подпис" in q_lower
+                or "документ" in q_lower
+            ):
+                logger.info(f"Запрос '{query}' перенаправлен с L3 на L2 (ошибка бизнес-логики/портала)")
+                line_enum = SupportLine.L2
+
             needs_rag = line_enum in (SupportLine.L1, SupportLine.L2)
 
             return RouteDecision(
                 line=line_enum,
-                confidence=max(0.0, min(1.0, float(parsed.get("confidence", 0.9)))),
+                confidence=max(0.0, min(1.0, float(parsed.get("confidence", 1.0)))),
                 topic=str(parsed.get("topic", "Общие вопросы")),
                 subtopic=parsed.get("subtopic"),
                 reasoning=str(parsed.get("reasoning", "")),
@@ -121,19 +140,17 @@ class IntentRouter:
         """Резервный эвристический классификатор."""
         q_lower = query.lower()
 
-        # L3: Технические инциденты
+        # L3: Только критические сбои инфраструктуры (500, crash, упал сервер)
         l3_keywords = [
             "500",
-            "error",
-            "ошибка сервера",
-            "упал",
-            "exception",
+            "internal server error",
+            "упал сервер",
+            "упала база",
+            "сервер упал",
+            "база упала",
             "traceback",
-            "не работает сайт",
-            "crash",
-            "баг",
         ]
-        if any(k in q_lower for k in l3_keywords):
+        if any(k in q_lower for k in l3_keywords) and "рдик" not in q_lower:
             return RouteDecision(
                 line=SupportLine.L3,
                 confidence=0.75,
@@ -150,6 +167,7 @@ class IntentRouter:
             "стих",
             "фильм",
             "пирог",
+            "шарлотк",
             "гороскоп",
             "песня",
             "привет как дела",
@@ -157,41 +175,64 @@ class IntentRouter:
         if any(k in q_lower for k in out_keywords):
             return RouteDecision(
                 line=SupportLine.OUT_OF_SCOPE,
-                confidence=0.8,
+                confidence=0.85,
                 topic="Вне контекста системы",
                 reasoning="Сработал эвристический фильтр непрофильных запросов",
                 needs_rag=False,
             )
 
-        # L2: Нормативка и регламенты
+        # L2: Технические сбои интерфейса, коды ошибок (РДИК), ЭЦП, документы и регламенты
         l2_keywords = [
-            "гост",
+            "рдик",
+            "ошибка",
+            "error",
+            "код ошибки",
+            "exception",
+            "crash",
+            "завис",
+            "не нажимается",
+            "не открывается",
+            "баг",
+            "белый экран",
+            # ЭЦП, криптография, документы, регламенты
+            "эцп",
+            "подпис",
+            "сертификат",
+            "криптопро",
+            "плагин",
+            "заполн",
+            "оферт",
+            "сте",
+            "мчд",
+            "доверенност",
             "регламент",
+            "гост",
             "фз-",
             "закон",
             "скзи",
             "арм",
-            "криптопро",
             "требован",
             "положен",
             "статья",
             "пункт",
             "закупк",
+            "акт",
+            "контракт",
         ]
         if any(k in q_lower for k in l2_keywords):
             return RouteDecision(
                 line=SupportLine.L2,
-                confidence=0.7,
-                topic="Нормативные требования",
-                reasoning="Запрос содержит нормативную терминологию",
+                confidence=0.75,
+                topic="Вопросы по работе в системе и регламентам",
+                reasoning="Запрос относится к работе с документами, ЭЦП, регламентами или сбоям интерфейса",
                 needs_rag=True,
             )
 
-        # L1: По умолчанию
+        # L1: Базовые типовые вопросы по умолчанию
         return RouteDecision(
             line=SupportLine.L1,
             confidence=0.6,
-            topic="Общий вопрос",
+            topic="Базовый вопрос",
             reasoning="Маршрутизация по умолчанию на первую линию поддержки",
             needs_rag=True,
         )
