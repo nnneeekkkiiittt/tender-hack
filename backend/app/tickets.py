@@ -155,6 +155,19 @@ def create_ticket(body: TicketCreate, user: CurrentUser, conn: DB, request: Requ
             "INSERT INTO messages(claim_id, author_kind, text, metadata) VALUES (%s, 'AI', %s, %s)",
             (row["id"], answer.answer, Jsonb(answer.model_dump(mode="json", exclude={"answer"}))),
         )
+        if answer.route:
+            resolved_topic = (answer.route.topic or "").strip()
+            resolved_subtopic = (answer.route.subtopic or "").strip() or None
+            topic_to_set = (
+                resolved_topic[:255]
+                if resolved_topic and (body.topic in ("OTHER", "TECHNICAL") or not body.topic)
+                else body.topic
+            )
+            subtopic_to_set = resolved_subtopic[:255] if resolved_subtopic else None
+            conn.execute(
+                "UPDATE claims SET topic = %s, subtopic = %s WHERE id = %s",
+                (topic_to_set, subtopic_to_set, row["id"]),
+            )
         if answer.status == "ESCALATED":
             advance(conn, row, int(answer.route.line[-1]))
     except AiServiceError as exc:

@@ -47,7 +47,7 @@ class CrossEncoderReranker:
             return float(chunk.score)
 
         text_lower = chunk.text.lower()
-        matched = sum(1 for w in q_words if w in text_lower)
+        matched = sum(1 for w in q_words if w in text_lower or (len(w) >= 4 and w[:4] in text_lower))
         coverage = matched / len(q_words)
 
         # Бонус за точное вхождение всей фразы или кода ошибки
@@ -88,6 +88,7 @@ class CrossEncoderReranker:
                 ]
                 req = RerankRequest(query=query, passages=passages)
                 results = self.ranker.rerank(req)
+                results.sort(key=lambda x: float(x.get("score", 0.0)), reverse=True)
 
                 reranked_chunks: List[RetrievedChunk] = []
                 for res in results[:top_k]:

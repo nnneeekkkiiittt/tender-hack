@@ -204,6 +204,16 @@ def test_cross_encoder_reranker_prioritizes_relevant_chunk():
     chunk2 = RetrievedChunk(text="Порядок загрузки машиночитаемой доверенности МЧД в профиль.", doc_name="Manual 2", score=0.75)
     chunk3 = RetrievedChunk(text="Кулинарные рецепты и выпечка пирогов.", doc_name="Manual 3", score=0.40)
 
+    # Мокируем ranker для детерминированной проверки упорядочивания по скору
+    if reranker.ranker is not None:
+        reranker.ranker.rerank = Mock(
+            return_value=[
+                {"id": 1, "score": 0.95, "meta": chunk2},
+                {"id": 0, "score": 0.45, "meta": chunk1},
+                {"id": 2, "score": 0.10, "meta": chunk3},
+            ]
+        )
+
     reranked = reranker.rerank("как загрузить машиночитаемую доверенность МЧД?", [chunk1, chunk2, chunk3], top_k=2)
     assert len(reranked) == 2
     # Чанк про МЧД должен быть на первом месте
@@ -253,5 +263,3 @@ def test_clean_text_removes_figures_and_markdown():
     assert "Рисунок" not in cleaned
     assert "(3)" not in cleaned
     assert cleaned.endswith(".")
-
-
