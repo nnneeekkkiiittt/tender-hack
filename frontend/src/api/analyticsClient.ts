@@ -54,7 +54,13 @@ async function request<T>(
   }
 
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  const text = await response.text().catch(() => '')
+  if (!text.trim()) return undefined as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return text as unknown as T
+  }
 }
 
 export const analyticsApi = {
