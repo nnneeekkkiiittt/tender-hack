@@ -57,6 +57,9 @@ func main() {
 	mux.HandleFunc("/api/v1/analytics/claims", handler.GetRawClaimsData)
 	mux.HandleFunc("/api/v1/analytics/messages", handler.GetRawMessagesData)
 	mux.HandleFunc("/api/v1/analytics/reactions", handler.GetRawReactionsData)
+	mux.HandleFunc("/api/v1/metrics/operator", handler.GetOperatorMetricsHandler)
+	mux.HandleFunc("/api/v1/metrics/topic", handler.GetTopicMetricsHandler)
+	mux.HandleFunc("/api/v1/metrics/escalations", handler.GetEscalationsHandler)
 
 	cancelCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

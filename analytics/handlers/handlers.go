@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -180,33 +179,76 @@ func (h *Handler) GetRawReactionsData(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, reactions)
 }
 
-// --- Вспомогательные функции (Helpers) ---
+// GetOperatorMetricsHandler — GET /api/v1/metrics/operator?operator_id=1
+func (h *Handler) GetOperatorMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-func parseQueryInt(val string, defaultVal int) int {
+	operatorIDStr := r.URL.Query().Get("operator_id")
+	operatorID, err := strconv.ParseInt(operatorIDStr, 10, 64)
+	if err != nil || operatorID < 0 {
+		http.Error(w, "Invalid or missing operator_id", http.StatusBadRequest)
+		return
+	}
+
+	metrics, err := h.dm.GetOperatorMetrics(r.Context(), operatorID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, metrics)
+}
+
+// GetTopicMetricsHandler — GET /api/v1/metrics/topic?topic=Оплата&subtopic=Ошибки
+func (h *Handler) GetTopicMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	topic := r.URL.Query().Get("topic")
+	subtopic := r.URL.Query().Get("subtopic")
+	if topic == "" || subtopic == "" {
+		http.Error(w, "Both 'topic' and 'subtopic' are required", http.StatusBadRequest)
+		return
+	}
+
+	metrics, err := h.dm.GetTopicMetrics(r.Context(), topic, subtopic)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, metrics)
+}
+
+// GetEscalationsHandler — GET /api/v1/metrics/escalations?threshold=20
+func (h *Handler) GetEscalationsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	threshold := parseQueryInt64(r.URL.Query().Get("threshold"), 20)
+
+	escalations, err := h.dm.GetEscalations(r.Context(), threshold)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, escalations)
+}
+
+func parseQueryInt64(val string, defaultVal int64) int64 {
 	if val == "" {
 		return defaultVal
 	}
-	if res, err := strconv.Atoi(val); err == nil && res >= 0 {
+	if res, err := strconv.ParseInt(val, 10, 64); err == nil && res > 0 {
 		return res
 	}
 	return defaultVal
-}
-
-func parseQueryInt64Slice(val string) []int64 {
-	var result []int64
-	items := strings.SplitSeq(val, ",")
-	for item := range items {
-		if num, err := strconv.ParseInt(strings.TrimSpace(item), 10, 64); err == nil {
-			result = append(result, num)
-		}
-	}
-	return result
-}
-
-func respondJSON(w http.ResponseWriter, code int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	if payload != nil {
-		_ = json.NewEncoder(w).Encode(payload)
-	}
 }
