@@ -1,7 +1,7 @@
 import React from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
-import { Ticket as TicketIcon, Plus, Clock } from 'lucide-react'
-import { Sidebar } from '@/components/layout/Sidebar'
+import { Ticket as TicketIcon, Plus, Clock, Settings } from 'lucide-react'
+import { Sidebar, NavItemLink } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { Button } from '@/components/ui/Button'
 import { useChatUiStore } from '@/store/chatStore'
@@ -47,6 +47,7 @@ export function UserLayout() {
             Новый вопрос
           </Button>
         }
+        footer={<NavItemLink item={{ to: '/app/settings', label: 'Настройки', icon: Settings }} />}
       >
         <div className="mt-5">
           <p className="mb-1.5 px-3 text-xs font-medium uppercase tracking-wide text-ink-muted">

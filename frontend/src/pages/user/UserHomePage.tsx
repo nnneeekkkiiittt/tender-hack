@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { ListChecks, FileText, PenTool, BarChart3 } from 'lucide-react'
+import { ListChecks, FileText, PenTool, BarChart3, ThumbsDown } from 'lucide-react'
 import { ChatInput } from '@/components/chat/ChatInput'
+import { ThinkingDots } from '@/components/chat/ThinkingDots'
 import { useAuthStore } from '@/store/authStore'
 import { useChatUiStore } from '@/store/chatStore'
 import { ticketRepository } from '@/services/tickets'
@@ -77,17 +78,18 @@ export function UserHomePage() {
           Задайте вопрос о закупках, документах или работе на Портале поставщиков
         </p>
         {question && (
-          <div className="mt-7 whitespace-pre-wrap break-words rounded-lg bg-primary p-4 text-white">
+          <div className="mt-7 animate-fade-in-up whitespace-pre-wrap break-words rounded-lg bg-primary p-4 text-white">
             {question}
           </div>
         )}
         {busy && (
-          <p role="status" className="mt-4 text-sm text-ink-muted">
-            AI ищет ответ в инструкциях… На локальной модели это может занять несколько минут.
+          <p role="status" className="mt-4 flex items-center justify-center gap-2 text-center text-sm text-ink-muted">
+            <span>AI ищет ответ в инструкциях… На локальной модели это может занять несколько минут.</span>
+            <ThinkingDots className="text-primary-light" />
           </p>
         )}
         {error && (
-          <div role="alert" className="mt-4 text-sm text-accent">
+          <div role="alert" className="mt-4 text-center text-sm text-accent">
             {error}
           </div>
         )}
@@ -111,8 +113,11 @@ export function UserHomePage() {
           </div>
         )}
         <p className="mt-8 text-center text-xs leading-relaxed text-ink-muted">
-          Сначала ответит AI. Если ответ не помог, нажмите 👎 или напишите ещё — поддержка L1
-          продолжит этот же чат. Вся история сохранится.
+          Сначала ответит AI. Если ответ не помог, нажмите{' '}
+          <ThumbsDown className="inline h-3.5 w-3.5 align-text-bottom" aria-label="дизлайк" /> или напишите ещё —
+          поддержка L1 продолжит этот же чат.
+          <br />
+          Вся история сохранится.
         </p>
       </div>
     </div>

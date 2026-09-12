@@ -25,7 +25,7 @@ interface SidebarProps {
   children?: React.ReactNode
 }
 
-function NavItemLink({ item }: { item: SidebarNavItem }) {
+export function NavItemLink({ item }: { item: SidebarNavItem }) {
   const Icon = item.icon
   const { setMobileSidebarOpen } = useUiStore()
   return (
