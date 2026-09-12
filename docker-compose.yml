@@ -240,6 +240,7 @@ services:
       - analytics
       - backend
     ports:
+      - '80:80'
       - '5173:80'
 
 volumes:
