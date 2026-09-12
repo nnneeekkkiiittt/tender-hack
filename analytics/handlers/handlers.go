@@ -266,20 +266,14 @@ func (h *Handler) GetTopicMetricsHandler(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusOK, metrics)
 }
 
-// GetEscalationsHandler — GET /api/v1/metrics/escalations?threshold=20
+// GetEscalationsHandler — GET /api/v1/metrics/escalations
 func (h *Handler) GetEscalationsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	threshold := parseQueryInt64(r.URL.Query().Get("threshold"), 20)
-	if threshold <= 0 {
-		http.Error(w, "Invalid 'threshold'", http.StatusBadRequest)
-		return
-	}
-
-	escalations, err := h.dm.GetEscalations(r.Context(), threshold)
+	escalations, err := h.dm.GetEscalations(r.Context())
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
