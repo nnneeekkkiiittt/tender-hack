@@ -1,6 +1,6 @@
 package models
 
-// UserRole представляет ENUM 'user_role'
+// PostgreSQL enum aliases.
 type UserRole string
 
 const (
@@ -11,17 +11,15 @@ const (
 	RoleUser      UserRole = "user"
 )
 
-// Status представляет ENUM 'status'
-type Status string
+type ClaimStatus string
 
 const (
-	StatusNew       Status = "NEW"
-	StatusInWork    Status = "IN WORK"
-	StatusCancelled Status = "CANCELLED"
-	StatusDone      Status = "DONE"
+	StatusNew       ClaimStatus = "NEW"
+	StatusInWork    ClaimStatus = "IN WORK"
+	StatusCancelled ClaimStatus = "CANCELLED"
+	StatusDone      ClaimStatus = "DONE"
 )
 
-// Reason представляет ENUM 'reason'
 type Reason string
 
 const (
@@ -29,4 +27,21 @@ const (
 	ReasonIncorrectAnswer  Reason = "INCORRECT ANSWER"
 	ReasonIrrelevantAnswer Reason = "IRRELEVANT ANSWER"
 	ReasonRudeBehaviour    Reason = "RUDE BEHAVIOUR"
+)
+
+type ReactionTargetKind string
+
+const (
+	TargetOperator  ReactionTargetKind = "OPERATOR"
+	TargetAIMessage ReactionTargetKind = "AI_MESSAGE"
+)
+
+type AuthorKind string
+
+const (
+	AuthorUser    AuthorKind = "USER"
+	AuthorSupport AuthorKind = "SUPPORT"
+	AuthorAdmin   AuthorKind = "ADMIN"
+	AuthorAI      AuthorKind = "AI"
+	AuthorSystem  AuthorKind = "SYSTEM"
 )

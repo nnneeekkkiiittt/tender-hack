@@ -47,7 +47,8 @@ the current schema, including nullable operators on AI reactions. It is not
 connected to the frontend statistics screens and has no public authentication;
 do not expose it externally.
 
-All published ports bind to loopback by default. Password-free demo switching
+The demo launcher binds all published ports to loopback. Direct Compose startup publishes the frontend
+on port 80; set `WEB_BIND=127.0.0.1` for localhost-only access. Password-free demo switching
 grants administrator access; exposing it is an explicit operator decision, not
 a production-safe configuration. The public server's settings and passwords are
 not part of this repository. Statistics remain a separate optional service.
@@ -67,7 +68,7 @@ parallel, give each a separate `--output` directory to avoid trace-file collisio
 
 1. Create `.env` from `.env.example` and set a strong `BOOTSTRAP_ADMIN_PASSWORD` (at least 10 characters).
 2. Run `python3 scripts/prepare-moderation.py`, then `docker compose up --build -d`.
-3. Open [the application](http://localhost:8080). Register a user, or sign in with your bootstrap administrator to create support accounts.
+3. Open [the application](http://localhost). Register a user, or sign in with your bootstrap administrator to create support accounts. Set `ALLOWED_ORIGINS=http://localhost` (or the actual public origin) in `.env`.
 
 The API and interactive contract are at [localhost:8000/docs](http://localhost:8000/docs). Liquibase runs before the backend starts. The bootstrap account is created only when no administrator exists; changing bootstrap environment variables does not reset existing passwords.
 

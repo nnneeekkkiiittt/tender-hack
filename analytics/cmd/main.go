@@ -19,9 +19,9 @@ import (
 func main() {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		getEnv("DB_USER", "postgres"),
-		getEnv("DB_PASSWORD", "postgres"),
-		getEnv("DB_HOST", "postgres"),
-		getEnv("DB_PORT", "5432"),
+		getEnv("DB_PASSWORD", " 9d5b09bfe734ca09d6fffdc2dc940c258e112588881bfacd"),
+		getEnv("DB_HOST", "111.88.153.146"),
+		getEnv("DB_PORT", "5433"),
 		getEnv("DB_NAME", "tender-hack"),
 	)
 	mux := http.NewServeMux()
@@ -57,6 +57,9 @@ func main() {
 	mux.HandleFunc("/api/v1/analytics/claims", handler.GetRawClaimsData)
 	mux.HandleFunc("/api/v1/analytics/messages", handler.GetRawMessagesData)
 	mux.HandleFunc("/api/v1/analytics/reactions", handler.GetRawReactionsData)
+	mux.HandleFunc("/api/v1/metrics/operator", handler.GetOperatorMetricsHandler)
+	mux.HandleFunc("/api/v1/metrics/topic", handler.GetTopicMetricsHandler)
+	mux.HandleFunc("/api/v1/metrics/escalations", handler.GetEscalationsHandler)
 
 	cancelCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

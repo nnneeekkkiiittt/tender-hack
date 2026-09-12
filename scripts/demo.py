@@ -108,6 +108,7 @@ def configuration(args, state):
     values.update(COMPOSE_PROFILES='' if args.mock else 'ml', AI_MODE='mock' if args.mock else 'http',
                   AI_URL='' if args.mock else 'http://ml:8001/ask')
     values['MODERATION_MODEL_PATH'] = str(state / 'models/moderation')
+    values['WEB_BIND'] = '127.0.0.1'
     target.write_text(''.join(f'{key}={value}\n' for key, value in values.items()))
     target.chmod(0o600)
     return values

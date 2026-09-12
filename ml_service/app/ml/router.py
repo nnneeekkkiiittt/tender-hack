@@ -5,6 +5,7 @@
 
 import json
 import logging
+import re
 from typing import Optional, List, Dict
 import requests
 
@@ -88,6 +89,9 @@ class IntentRouter:
             data = response.json()
             content = data["choices"][0]["message"]["content"].strip()
 
+            if content.startswith('```'):
+                content = re.sub(r'^```(?:json)?\s*', '', content)
+                content = re.sub(r'\s*```$', '', content)
             parsed = json.loads(content)
 
             # Валидация линии через enum без приватных атрибутов
