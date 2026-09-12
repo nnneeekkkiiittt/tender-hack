@@ -229,7 +229,7 @@ func (h *Handler) GetOperatorMetricsHandler(w http.ResponseWriter, r *http.Reque
 
 	operatorIDStr := r.URL.Query().Get("operator_id")
 	operatorID, err := strconv.ParseInt(operatorIDStr, 10, 64)
-	if err != nil || operatorID <= 0 {
+	if err != nil || operatorID < 0 {
 		http.Error(w, "Invalid or missing operator_id", http.StatusBadRequest)
 		return
 	}

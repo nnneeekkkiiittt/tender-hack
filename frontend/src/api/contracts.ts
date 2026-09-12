@@ -24,9 +24,10 @@ export const topics = {
 export type Topic = keyof typeof topics
 export const reasons = {
   'SLOW WORK': 'Медленная работа',
-  'INCORRECT ANSWER': 'Неверный ответ',
-  'IRRELEVANT ANSWER': 'Ответ не по теме',
-  'RUDE BEHAVIOUR': 'Грубое общение',
+  'INCORRECT ANSWER': 'Неправильный ответ',
+  'IRRELEVANT ANSWER': 'Нерелевантный ответ',
+  'RUDE BEHAVIOUR': 'Грубое обращение',
+  'DEPRECATED KNOWLEDGE BASE': 'Ответ устарел',
 }
 export interface Ticket {
   id: string

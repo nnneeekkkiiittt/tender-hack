@@ -63,7 +63,7 @@ export function UserTicketDetailPage() {
   if (isError || !ticket) return <ErrorState title="Заявка не найдена" onRetry={() => refetch()} />
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-6xl animate-fade-in-up px-4 py-6 sm:px-6">
       <Link
         to="/tickets"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
@@ -100,7 +100,7 @@ export function UserTicketDetailPage() {
                   </p>
                 )
               return (
-                <div key={message.id} className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
+                <div key={message.id} className={cn('flex animate-fade-in-up gap-3', isUser && 'flex-row-reverse')}>
                   {!isAi && (
                     <Avatar
                       name={message.authorName}

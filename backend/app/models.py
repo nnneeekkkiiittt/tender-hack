@@ -16,7 +16,9 @@ Role = Literal["user", "admin", "supportL1", "supportL2", "supportL3"]
 SupportRole = Literal["supportL1", "supportL2", "supportL3"]
 Status = Literal["NEW", "IN WORK", "DONE", "CANCELLED"]
 Topic = Literal["TECHNICAL", "DOCUMENTS", "PROCUREMENT", "ACCOUNT", "CONTRACT", "OTHER"]
-Reason = Literal["SLOW WORK", "INCORRECT ANSWER", "IRRELEVANT ANSWER", "RUDE BEHAVIOUR"]
+Reason = Literal[
+    "SLOW WORK", "INCORRECT ANSWER", "IRRELEVANT ANSWER", "RUDE BEHAVIOUR", "DEPRECATED KNOWLEDGE BASE"
+]
 
 
 class Input(BaseModel):
@@ -87,7 +89,7 @@ class Classification(Input):
 
 class ReactionInput(Input):
     like: bool
-    reasons: list[Reason] = Field(default_factory=list, max_length=4)
+    reasons: list[Reason] = Field(default_factory=list, max_length=5)
 
     @model_validator(mode="after")
     def validate_reasons(self):

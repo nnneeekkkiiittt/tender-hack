@@ -6,7 +6,8 @@ export async function checkAnalyticsHealth(): Promise<boolean> {
   try {
     await analyticsApi.get<void>('/api/v1/analytics/health-check')
     return true
-  } catch {
+  } catch (err) {
+    console.warn('Analytics health check failed:', err)
     return false
   }
 }

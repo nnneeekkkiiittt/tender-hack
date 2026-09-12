@@ -7,7 +7,7 @@ import { ErrorState } from '@/components/ui/ErrorState'
 import { Button } from '@/components/ui/Button'
 import { OperatorAiPanel } from '@/components/admin/OperatorAiPanel'
 import { TopicsPanel } from '@/components/admin/TopicsPanel'
-import { EscalationsPanel } from '@/components/admin/EscalationsPanel'
+import { EscalationsSummary } from '@/components/admin/EscalationsSummary'
 import { claimsAnalyticsService } from '@/services/analytics'
 import { checkAnalyticsHealth } from '@/services/analytics/healthCheck'
 import { isApiMode } from '@/config/env'
@@ -83,6 +83,7 @@ export function AdminAnalyticsPage() {
 
       {data && (
         <div className="mt-6 space-y-8">
+          <EscalationsSummary data={data.escalations} />
           <OperatorAiPanel
             data={data.operatorAi}
             operators={operatorOptions}
@@ -90,7 +91,6 @@ export function AdminAnalyticsPage() {
             onSelectOperator={setSelectedOperatorId}
           />
           <TopicsPanel data={data.topics} />
-          <EscalationsPanel data={data.escalations} />
         </div>
       )}
     </div>
