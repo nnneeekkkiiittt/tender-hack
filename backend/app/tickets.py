@@ -135,8 +135,8 @@ def create_ticket(body: TicketCreate, user: CurrentUser, conn: DB, request: Requ
         return serialize(load_ticket(conn, existing['id'], user))
     require_allowed(request.app.state.moderation_service, body.text)
     row = conn.execute(
-        """INSERT INTO claims(author_id, title, topic, request_id)
-        VALUES (%s, %s, %s, %s) ON CONFLICT (author_id, request_id) DO NOTHING RETURNING id""",
+        """INSERT INTO claims(author_id, title, topic, request_id, operator_id)
+        VALUES (%s, %s, %s, %s, 0) ON CONFLICT (author_id, request_id) DO NOTHING RETURNING id""",
         (user["id"], body.text[:255], body.topic, body.request_id),
     ).fetchone()
     if not row:
