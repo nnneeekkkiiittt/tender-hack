@@ -274,14 +274,14 @@ func (m *DataManager) GetTopicMetrics(ctx context.Context, topic, subtopic strin
 	return res, nil
 }
 
-func (m *DataManager) GetEscalations(ctx context.Context, minTicketsThreshold int64) ([]models.EscalationResult, error) {
+func (m *DataManager) GetEscalations(ctx context.Context) ([]models.EscalationResult, error) {
 	const query = `WITH weekly_stats AS (
 		SELECT c.topic,c.subtopic,
 		COUNT(DISTINCT c.id) FILTER (WHERE c.created_at >= NOW()-INTERVAL '7 days') AS current_week,
 		COUNT(DISTINCT c.id) FILTER (WHERE c.created_at >= NOW()-INTERVAL '35 days' AND c.created_at < NOW()-INTERVAL '7 days')::float / 4.0 AS avg_4_weeks
 		FROM claims c WHERE c.subtopic IS NOT NULL GROUP BY c.topic,c.subtopic
-	) SELECT topic,subtopic,current_week,avg_4_weeks FROM weekly_stats WHERE current_week >= $1 AND avg_4_weeks > 0`
-	rows, err := m.db.Query(ctx, query, minTicketsThreshold)
+	) SELECT topic,subtopic,current_week,avg_4_weeks FROM weekly_stats WHERE avg_4_weeks > 0`
+	rows, err := m.db.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error escalations query: %w", err)
 	}
