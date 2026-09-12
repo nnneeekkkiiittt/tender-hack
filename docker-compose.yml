@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       POSTGRES_DB: ${DB_NAME:-tender-hack}
     ports:
       - '5433:5433'
@@ -38,7 +38,7 @@ services:
     environment:
       - LIQUIBASE_COMMAND_URL=jdbc:postgresql://postgres:5432/tender-hack
       - LIQUIBASE_COMMAND_USERNAME=postgres
-      - LIQUIBASE_COMMAND_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - LIQUIBASE_COMMAND_PASSWORD=${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       - LIQUIBASE_COMMAND_CHANGELOG_FILE=changelog_master.yml
       - LIQUIBASE_SEARCH_PATH=/changelog
     volumes:
@@ -49,7 +49,7 @@ services:
     build: ./backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/tender-hack
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}@postgres:5432/tender-hack
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080}
@@ -187,9 +187,9 @@ services:
         condition: service_healthy
     environment:
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       DB_HOST: postgres
-      DB_PORT: '5433'
+      DB_PORT: '5432'
       DB_NAME: ${DB_NAME:-tender-hack}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       # Metabase integration — all optional; dashboards still save without
@@ -214,9 +214,9 @@ services:
     environment:
       MB_DB_TYPE: postgres
       MB_DB_HOST: postgres
-      MB_DB_PORT: '5433'
+      MB_DB_PORT: '5432'
       MB_DB_USER: ${DB_USER:-postgres}
-      MB_DB_PASS: ${DB_PASSWORD:-postgres}
+      MB_DB_PASS: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       # Metabase's OWN application database. Using a separate logical DB
       # keeps Metabase's internal tables out of the analytics schema; create
       # it once with: CREATE DATABASE metabase_app;
@@ -244,3 +244,6 @@ services:
 
 volumes:
   tenderhack_postgres_data:
+  qdrant_data:
+  tei_data:
+
