@@ -1,8 +1,8 @@
 import { isDemoMode } from '@/config/env'
 import React from 'react'
 import { Outlet } from 'react-router-dom'
-import { Inbox, User as UserIcon, ShieldAlert, BarChart3 } from 'lucide-react'
-import { Sidebar } from '@/components/layout/Sidebar'
+import { Inbox, User as UserIcon, ShieldAlert, BarChart3, Settings } from 'lucide-react'
+import { Sidebar, NavItemLink } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { useAuthStore } from '@/store/authStore'
 
@@ -23,6 +23,7 @@ export function SupportLayout() {
             ],
           },
         ]}
+        footer={<NavItemLink item={{ to: '/support/settings', label: 'Настройки', icon: Settings }} />}
       />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Header />

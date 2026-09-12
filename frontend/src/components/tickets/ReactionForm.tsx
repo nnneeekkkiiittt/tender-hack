@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { reasons, type ReactionInput } from '@/api/contracts'
 import { Button } from '@/components/ui/Button'
 export function ReactionForm({
@@ -33,8 +34,8 @@ export function ReactionForm({
     >
       <div className="flex gap-3" role="radiogroup" aria-label="Оценка">
         {[
-          { value: true, emoji: '👍', label: 'Хорошо' },
-          { value: false, emoji: '👎', label: 'Плохо' },
+          { value: true, Icon: ThumbsUp, label: 'Хорошо' },
+          { value: false, Icon: ThumbsDown, label: 'Плохо' },
         ].map((option) => (
           <label key={option.label} title={option.label} className="relative cursor-pointer">
             <input
@@ -48,9 +49,9 @@ export function ReactionForm({
             />
             <span
               aria-hidden="true"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-2xl transition-colors hover:bg-gray-50 peer-checked:border-primary peer-checked:bg-primary/10 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-light peer-disabled:opacity-50"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-border text-ink-muted transition-colors hover:bg-gray-50 peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary-light peer-disabled:opacity-50"
             >
-              {option.emoji}
+              <option.Icon className="h-5 w-5" strokeWidth={2} />
             </span>
           </label>
         ))}
