@@ -6,6 +6,7 @@ ML Core пакет системы интеллектуальной поддер�
 from .config import settings
 from .schemas import (
     SupportLine,
+    ResolutionStatus,
     RouteDecision,
     RetrievedChunk,
     RAGResult,
@@ -19,6 +20,7 @@ from .pipeline import SupportMLPipeline
 __all__ = [
     "settings",
     "SupportLine",
+    "ResolutionStatus",
     "RouteDecision",
     "RetrievedChunk",
     "RAGResult",
