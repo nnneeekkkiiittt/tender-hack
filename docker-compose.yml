@@ -21,7 +21,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       POSTGRES_DB: ${DB_NAME:-tender-hack}
     ports:
-      - '5433:5433'
+      - '5433:5432'
     volumes:
       - tenderhack_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -191,7 +191,7 @@ services:
       DB_HOST: postgres
       DB_PORT: '5432'
       DB_NAME: ${DB_NAME:-tender-hack}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
       # Metabase integration — all optional; dashboards still save without
       # them, widgets just won't render until these are set (see
       # analytics/README.md for how to obtain each value).
@@ -233,7 +233,7 @@ services:
       args:
         VITE_APP_MODE: ${VITE_APP_MODE:-api}
         VITE_API_URL: ${VITE_API_URL:-/api}
-        VITE_ANALYTICS_API_URL: ${VITE_ANALYTICS_API_URL:-http://localhost:8080}
+        VITE_ANALYTICS_API_URL: ${VITE_ANALYTICS_API_URL:-}
         VITE_METABASE_URL: ${VITE_METABASE_URL:-http://localhost:3000}
     restart: unless-stopped
     depends_on:

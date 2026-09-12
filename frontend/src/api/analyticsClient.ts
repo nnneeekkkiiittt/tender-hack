@@ -21,7 +21,12 @@ async function request<T>(
   options: { method?: string; params?: Record<string, unknown>; body?: unknown } = {},
 ): Promise<T> {
   const { method = 'GET', params, body } = options
-  const url = new URL(ANALYTICS_API_URL.replace(/\/$/, '') + path)
+  const base = ANALYTICS_API_URL
+    ? ANALYTICS_API_URL.replace(/\/$/, '')
+    : typeof window !== 'undefined'
+      ? window.location.origin
+      : 'http://localhost:8080'
+  const url = new URL(base + path)
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
