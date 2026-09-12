@@ -171,3 +171,40 @@ def test_keyword_match_for_error_code():
     assert len(matches) == 1
     assert matches[0].page == 67
     assert "РДИК_0217" in matches[0].text
+
+
+def test_extract_action_for_error_fallback():
+    from app.ml.generator import extract_action_for_error, AnswerGenerator
+
+    chunk = RetrievedChunk(
+        text="3) При возникновении ошибок: • РДИК_0217, – требуется нажать на кнопку «Обновить данные из контракта ЕИС» (Рисунок 65).",
+        doc_name="Инструкция",
+        page=67,
+    )
+    action = extract_action_for_error("ошибка РДИК_0217", [chunk])
+    assert action == "При возникновении ошибки РДИК_0217 требуется нажать на кнопку «Обновить данные из контракта ЕИС»."
+
+    # Проверяем, что AnswerGenerator использует extract_action при оборванном ответе LLM
+    gen = AnswerGenerator()
+    gen.session = Mock()
+    mock_resp = Mock()
+    mock_resp.json.return_value = {"choices": [{"message": {"content": "Ошибка РДИК_0217 не описана в 《"}}]}
+    mock_resp.raise_for_status = Mock()
+    gen.session.post.return_value = mock_resp
+
+    answer = gen.generate("ошибка РДИК_0217", [chunk])
+    assert answer == "При возникновении ошибки РДИК_0217 требуется нажать на кнопку «Обновить данные из контракта ЕИС»."
+
+
+def test_cross_encoder_reranker_prioritizes_relevant_chunk():
+    from app.ml.reranker import CrossEncoderReranker
+
+    reranker = CrossEncoderReranker()
+    chunk1 = RetrievedChunk(text="Общие сведения о системе и регламенте торгов.", doc_name="Manual 1", score=0.82)
+    chunk2 = RetrievedChunk(text="Порядок загрузки машиночитаемой доверенности МЧД в профиль.", doc_name="Manual 2", score=0.75)
+    chunk3 = RetrievedChunk(text="Кулинарные рецепты и выпечка пирогов.", doc_name="Manual 3", score=0.40)
+
+    reranked = reranker.rerank("как загрузить машиночитаемую доверенность МЧД?", [chunk1, chunk2, chunk3], top_k=2)
+    assert len(reranked) == 2
+    # Чанк про МЧД должен быть на первом месте
+    assert "МЧД" in reranked[0].text

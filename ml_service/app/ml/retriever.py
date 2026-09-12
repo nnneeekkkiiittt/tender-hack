@@ -15,6 +15,7 @@ import requests
 
 from .config import settings
 from .schemas import SupportLine, RetrievedChunk
+from .reranker import CrossEncoderReranker
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,8 @@ class KBRetriever:
                 )
             except Exception as e:
                 logger.warning(f"Ошибка подключения к Qdrant ({self.qdrant_url}): {e}")
+
+        self.reranker = CrossEncoderReranker()
 
     def _get_vllm_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -336,12 +339,22 @@ class KBRetriever:
                 reverse=True,
             )
 
-            # Отсекаем по адаптивному порогу релевантности и лимиту k
+            # Этап 1: Отбор кандидатов по адаптивному порогу релевантности
             effective_threshold = min(self.score_threshold, 0.70)
-            final_chunks: List[RetrievedChunk] = []
-            for item in ranked_items[:k]:
+            candidate_chunks: List[RetrievedChunk] = []
+            for item in ranked_items[:max(12, k * 3)]:
                 if item.get("is_keyword_match") or item["max_score"] >= effective_threshold:
-                    final_chunks.append(item["chunk"])
+                    candidate_chunks.append(item["chunk"])
+
+            if not candidate_chunks:
+                return []
+
+            # Этап 2: Cross-Encoder реранкинг для отсечения шума и выбора 1-2 лучших чанков
+            reranker = getattr(self, "reranker", None)
+            if reranker is not None and hasattr(reranker, "rerank"):
+                final_chunks = reranker.rerank(query, candidate_chunks, top_k=min(k, 2))
+            else:
+                final_chunks = candidate_chunks[:min(k, 2)]
 
             return final_chunks
 

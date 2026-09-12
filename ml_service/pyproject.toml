@@ -9,6 +9,7 @@ dependencies = [
   "qdrant-client>=1.10,<2",
   "pymupdf4llm>=0.0.17,<1",
   "numpy>=2,<3",
+  "flashrank>=0.2.10",
 ]
 
 [dependency-groups]
