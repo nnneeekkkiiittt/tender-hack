@@ -25,7 +25,7 @@ class CrossEncoderReranker:
     Оценивает кандидатов, отсекает околотематический шум и оставляет 1-2 лучших фрагмента.
     """
 
-    def __init__(self, model_name: str = "ms-marco-MiniLM-L-12-v2", cache_dir: str = "/tmp/flashrank"):
+    def __init__(self, model_name: str = "ms-marco-MultiBERT-L-12", cache_dir: str = "/tmp/flashrank"):
         self.model_name = model_name
         self.ranker = None
         if Ranker is not None:
@@ -36,8 +36,13 @@ class CrossEncoderReranker:
                 logger.warning(f"Не удалось инициализировать FlashRank: {e}. Будет использован лексический фолбэк.")
 
     def _lexical_fallback_score(self, query: str, chunk: RetrievedChunk) -> float:
-        """Резервный скоринг на основе пересечения лексем, плотности терминов и кодов."""
-        q_words = set(re.findall(r"[а-яА-ЯёЁa-zA-Z0-9_-]{3,}", query.lower()))
+        """Резервный скоринг на основе пересечения лексем, плотности терминов и кодов с фильтрацией стоп-слов."""
+        stopwords = {
+            "как", "где", "какие", "какая", "какой", "каком", "какую", "нужны", "нужен", "нужна",
+            "что", "это", "для", "или", "при", "под", "над", "без", "все", "всё", "если", "почему",
+            "можно", "нужно", "делать", "пожалуйста", "подскажите"
+        }
+        q_words = set(re.findall(r"[а-яА-ЯёЁa-zA-Z0-9_-]{3,}", query.lower())) - stopwords
         if not q_words:
             return float(chunk.score)
 
@@ -52,7 +57,7 @@ class CrossEncoderReranker:
         return float(chunk.score) * 0.4 + coverage * 0.4 + code_bonus + exact_phrase_bonus
 
     def rerank(
-        self, query: str, chunks: List[RetrievedChunk], top_k: int = 2
+        self, query: str, chunks: List[RetrievedChunk], top_k: int = 3
     ) -> List[RetrievedChunk]:
         """
         Реранкинг списка кандидатов.

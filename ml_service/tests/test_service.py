@@ -208,3 +208,37 @@ def test_cross_encoder_reranker_prioritizes_relevant_chunk():
     assert len(reranked) == 2
     # Чанк про МЧД должен быть на первом месте
     assert "МЧД" in reranked[0].text
+
+
+def test_suggestion_query_canonical_expansion():
+    retriever = KBRetriever.__new__(KBRetriever)
+    retriever.session = Mock()
+    queries = retriever.expand_query("Какие документы нужны?")
+    assert len(queries) >= 3
+    assert queries[0] == "Какие документы нужны?"
+    assert any("регистрац" in q.lower() or "документ" in q.lower() for q in queries)
+
+
+def test_keyword_match_ignores_stopwords():
+    retriever = KBRetriever.__new__(KBRetriever)
+    chunk = RetrievedChunk(
+        text="Пользователь выполняет какие-либо нужные действия в системе.",
+        doc_name="Инструкция",
+        page=10,
+    )
+    retriever._cached_chunks = [(chunk, chunk.text.lower(), "")]
+    # Запрос со стоп-словами без кодов не должен триггерить точный поиск
+    matches = retriever._search_keyword_matches("Какие документы нужны?", "manuals_e5_v1")
+    assert matches == []
+
+    # Запрос с технической аббревиатурой должен сработать
+    chunk_ecp = RetrievedChunk(
+        text="Настройка сертификата ЭЦП и плагина КриптоПро.",
+        doc_name="Инструкция",
+        page=20,
+    )
+    retriever._cached_chunks.append((chunk_ecp, chunk_ecp.text.lower(), ""))
+    matches_ecp = retriever._search_keyword_matches("Не работает ЭЦП", "manuals_e5_v1")
+    assert len(matches_ecp) >= 1
+    assert "ЭЦП" in matches_ecp[0].text
+

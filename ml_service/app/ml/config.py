@@ -28,8 +28,8 @@ class MLSettings:
     QDRANT_API_KEY: str = field(default_factory=lambda: os.getenv("QDRANT_API_KEY", ""))
 
     # Имена коллекций в Qdrant
-    COLLECTION_L1: str = field(default_factory=lambda: os.getenv("COLLECTION_L1", "kb_l1"))
-    COLLECTION_L2: str = field(default_factory=lambda: os.getenv("COLLECTION_L2", "kb_support"))
+    COLLECTION_L1: str = field(default_factory=lambda: os.getenv("COLLECTION_L1", "manuals_e5_v1"))
+    COLLECTION_L2: str = field(default_factory=lambda: os.getenv("COLLECTION_L2", "manuals_e5_v1"))
 
     # Параметры поиска и пороги отсечения
     TOP_K: int = field(default_factory=lambda: int(os.getenv("TOP_K", "4")))
@@ -40,7 +40,7 @@ class MLSettings:
     GENERATOR_TEMPERATURE: float = 0.1
     MAX_TOKENS_GENERATOR: int = 512
     REQUEST_TIMEOUT: float = field(default_factory=lambda: float(os.getenv("REQUEST_TIMEOUT", "120")))
-    EMBEDDING_PREFIX: str = field(default_factory=lambda: os.getenv("EMBEDDING_PREFIX", ""))
+    EMBEDDING_PREFIX: str = field(default_factory=lambda: os.getenv("EMBEDDING_PREFIX", "query: "))
 
 
 settings = MLSettings()
