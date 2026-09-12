@@ -17,7 +17,15 @@ import time
 import requests
 import pymupdf4llm
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct, VectorParams, Distance
+from qdrant_client.models import (
+    PointStruct,
+    VectorParams,
+    Distance,
+    PayloadSchemaType,
+    Filter,
+    FieldCondition,
+    MatchValue,
+)
 
 # Гарантируем, что локальные сервисы Docker (Qdrant, TEI) не заворачиваются в системный прокси
 _curr_no_proxy = os.environ.get("NO_PROXY", "")
@@ -337,17 +345,64 @@ class QdrantKBIndexer:
         self.session = requests.Session()
         self.client = QdrantClient(url=self.qdrant_url, prefer_grpc=False, check_compatibility=False)
 
+    @staticmethod
+    def generate_point_id(doc_name: str, page: int, chunk_idx: int) -> str:
+        """Детерминированный UUID v5: идемпотентный, исключает дублирование при перезапуске."""
+        key = f"{doc_name}:{page}:{chunk_idx}"
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, key))
+
+    def _create_payload_indexes(self, collection_name: str):
+        """Создает индексы для быстрой фильтрации по полям payload."""
+        fields = [
+            ("doc_name", PayloadSchemaType.KEYWORD),
+            ("support_line", PayloadSchemaType.KEYWORD),
+            ("data_type", PayloadSchemaType.KEYWORD),
+            ("page", PayloadSchemaType.INTEGER),
+        ]
+        for field_name, schema in fields:
+            try:
+                self.client.create_payload_index(
+                    collection_name=collection_name,
+                    field_name=field_name,
+                    field_schema=schema
+                )
+            except Exception:
+                pass
+
     def ensure_collection(self, collection_name: str):
-        """Создает коллекцию с Cosine distance, если она еще не существует."""
+        """Создает коллекцию с Cosine distance, on_disk_payload и индексами, если она еще не существует."""
         if not self.client.collection_exists(collection_name=collection_name):
-            print(f"Создание новой коллекции Qdrant '{collection_name}' (dim={self.vector_size}, distance=COSINE)...")
+            print(f"Создание новой коллекции Qdrant '{collection_name}' (dim={self.vector_size}, distance=COSINE, on_disk_payload=True)...")
             self.client.create_collection(
                 collection_name=collection_name,
-                vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE)
+                vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
+                on_disk_payload=True
             )
-            print(f"Коллекция '{collection_name}' успешно создана.")
+            self._create_payload_indexes(collection_name)
+            print(f"Коллекция '{collection_name}' и payload-индексы успешно созданы.")
         else:
+            self._create_payload_indexes(collection_name)
             print(f"Коллекция Qdrant '{collection_name}' уже существует.")
+
+    def delete_document_points(self, collection_name: str, doc_name: str):
+        """Точечно удаляет из коллекции чанки конкретного документа перед перезаливкой."""
+        if not self.client.collection_exists(collection_name):
+            return
+        print(f"Очистка устаревших чанков документа '{doc_name}' в коллекции '{collection_name}'...")
+        try:
+            self.client.delete(
+                collection_name=collection_name,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="doc_name",
+                            match=MatchValue(value=doc_name)
+                        )
+                    ]
+                )
+            )
+        except Exception as e:
+            print(f"Предупреждение при очистке старых чанков документа: {e}")
 
     def get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Получает векторные представления через TEI (bge-m3)."""
@@ -386,14 +441,26 @@ class QdrantKBIndexer:
         batch_size: int = 8,
         recreate: bool = False
     ):
-        """Пакетное получение эмбеддингов и загрузка PointStruct в Qdrant."""
+        """Пакетное получение эмбеддингов и идемпотентная загрузка PointStruct в Qdrant."""
         if recreate and self.client.collection_exists(collection_name):
-            print(f"Пересоздание коллекции '{collection_name}' (очистка старых данных)...")
+            print(f"Пересоздание коллекции '{collection_name}' (полная очистка)...")
             self.client.delete_collection(collection_name)
+
         self.ensure_collection(collection_name)
         self.wait_for_tei()
+
+        if not chunks:
+            print("Предупреждение: список чанков пуст, нечего индексировать.")
+            return
+
+        target_doc = chunks[0]["metadata"].get("doc_name", "document")
+
+        # Точечно удаляем старые версии этого документа, если коллекция не пересоздавалась целиком
+        if not recreate:
+            self.delete_document_points(collection_name, target_doc)
+
         total = len(chunks)
-        print(f"Загрузка {total} чанков в коллекцию '{collection_name}' батчами по {batch_size}...")
+        print(f"Индексация {total} чанков документа '{target_doc}' в коллекцию '{collection_name}' (батч={batch_size})...")
 
         for i in range(0, total, batch_size):
             batch = chunks[i:i + batch_size]
@@ -405,24 +472,28 @@ class QdrantKBIndexer:
                 print(f"Ошибка при получении эмбеддингов от TEI ({self.tei_url}): {e}")
                 raise
 
-            points = [
-                PointStruct(
-                    id=str(uuid.uuid4()),
-                    vector=embeddings[j],
-                    payload={
-                        "page_content": item["text"],
-                        **item["metadata"]
-                    }
+            points = []
+            for j, item in enumerate(batch):
+                global_idx = i + j
+                page_num = item["metadata"].get("page", 1)
+                point_id = self.generate_point_id(target_doc, page_num, global_idx)
+                points.append(
+                    PointStruct(
+                        id=point_id,
+                        vector=embeddings[j],
+                        payload={
+                            "page_content": item["text"],
+                            **item["metadata"]
+                        }
+                    )
                 )
-                for j, item in enumerate(batch)
-            ]
 
             self.client.upsert(collection_name=collection_name, points=points)
 
             processed = min(i + batch_size, total)
             print(f"Прогресс: загружено {processed}/{total} ({int(processed / total * 100)}%)")
 
-        print("Индексация в Qdrant успешно завершена!")
+        print(f"Индексация документа '{target_doc}' успешно завершена! Создано/обновлено {total} точек.")
 
 
 def main():
