@@ -22,16 +22,27 @@ func TestCurrentSchema(t *testing.T) {
 	}
 	defer pool.Close()
 	m := New(pool)
-	if _, err := m.GetRawUsersData(ctx, models.UsersFilter{Roles: []models.UserRole{"admin"}, Limit: 100}); err != nil {
+	if _, err := m.GetRawUsersData(ctx, models.UsersFilter{
+		Roles:      []models.UserRole{"admin"},
+		Pagination: models.Pagination{Limit: 100},
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.GetRawClaimsData(ctx, models.ClaimsFilter{Statuses: []models.Status{"NEW"}, Limit: 100}); err != nil {
+	if _, err := m.GetRawClaimsData(ctx, models.ClaimsFilter{
+		Statuses:   []models.ClaimStatus{"NEW"},
+		Pagination: models.Pagination{Limit: 100},
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.GetRawReactionsData(ctx, models.ReactionsFilter{Limit: 100}); err != nil {
+	if _, err := m.GetRawReactionsData(ctx, models.ReactionsFilter{
+		Pagination: models.Pagination{Limit: 100},
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.GetRawReactionsData(ctx, models.ReactionsFilter{Reasons: []models.Reason{"INCORRECT ANSWER"}, Limit: 100}); err != nil {
+	if _, err := m.GetRawReactionsData(ctx, models.ReactionsFilter{
+		Reasons:    []models.Reason{"INCORRECT ANSWER"},
+		Pagination: models.Pagination{Limit: 100},
+	}); err != nil {
 		t.Fatal(err)
 	}
 }

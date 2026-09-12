@@ -3,6 +3,7 @@ package main
 import (
 	"analytics/handlers"
 	datamanager "analytics/internal/data_manager"
+	"analytics/internal/metabase"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -41,17 +43,23 @@ func main() {
 	log.Println("Successfully connected to PostgreSQL")
 
 	dm := datamanager.New(dbpool)
-	handler := handlers.NewHandler(dm)
 
-	server := &http.Server{
-		Addr:         ":8080",
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	mbConfig := metabase.Config{
+		SiteURL:         getEnv("METABASE_URL", ""),
+		APIKey:          getEnv("METABASE_API_KEY", ""),
+		EmbeddingSecret: getEnv("METABASE_EMBEDDING_SECRET", ""),
+		DatabaseID:      getEnvInt("METABASE_DATABASE_ID", 0),
+	}
+	mbService := metabase.NewService(mbConfig)
+	if mbService.Enabled() {
+		log.Println("Metabase integration enabled:", mbConfig.SiteURL)
+	} else {
+		log.Println("Metabase integration disabled (METABASE_URL/METABASE_API_KEY/METABASE_DATABASE_ID not fully set) — dashboards can still be created, but widgets won't render until it's configured")
 	}
 
-	//ednpoints
+	handler := handlers.NewHandler(dm, mbService)
+
+	//endpoints — raw data + existing metrics
 	mux.HandleFunc("/api/v1/analytics/health-check", handlers.HealthCheck)
 	mux.HandleFunc("/api/v1/analytics/users", handler.GetRawUsersData)
 	mux.HandleFunc("/api/v1/analytics/claims", handler.GetRawClaimsData)
@@ -60,6 +68,42 @@ func main() {
 	mux.HandleFunc("/api/v1/metrics/operator", handler.GetOperatorMetricsHandler)
 	mux.HandleFunc("/api/v1/metrics/topic", handler.GetTopicMetricsHandler)
 	mux.HandleFunc("/api/v1/metrics/escalations", handler.GetEscalationsHandler)
+
+	// endpoints — custom dashboards (DashboardTemplate persistence + Metabase embedding)
+	mux.HandleFunc("/api/v1/dashboards", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handler.ListDashboards(w, r)
+		case http.MethodPost:
+			handler.CreateDashboard(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/v1/dashboards/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handler.GetDashboard(w, r)
+		case http.MethodPut:
+			handler.UpdateDashboard(w, r)
+		case http.MethodDelete:
+			handler.DeleteDashboard(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/v1/dashboards/{id}/widgets/{widgetId}/embed-url", handler.GetWidgetEmbedURL)
+	mux.HandleFunc("/api/v1/metabase/bootstrap", handler.BootstrapMetabaseDashboard)
+
+	corsHandler := handlers.WithCORS(mux, handlers.CORSAllowedOriginsFromEnv())
+
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      corsHandler,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 
 	cancelCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -92,4 +136,16 @@ func getEnv(key, defaultVal string) string {
 		return val
 	}
 	return defaultVal
+}
+
+func getEnvInt(key string, defaultVal int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	parsed, err := strconv.Atoi(val)
+	if err != nil {
+		return defaultVal
+	}
+	return parsed
 }
