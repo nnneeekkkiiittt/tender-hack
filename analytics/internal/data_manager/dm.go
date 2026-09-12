@@ -29,7 +29,7 @@ func (m *DataManager) GetRawUsersData(ctx context.Context, f models.UsersFilter)
 	}
 
 	if len(f.Roles) > 0 {
-		query += fmt.Sprintf(" AND role = ANY($%d)", argID)
+		query += fmt.Sprintf(" AND role::text = ANY($%d)", argID)
 		args = append(args, f.Roles)
 		argID++
 	}
@@ -77,7 +77,7 @@ func (m *DataManager) GetRawClaimsData(ctx context.Context, f models.ClaimsFilte
 	}
 
 	if len(f.Statuses) > 0 {
-		query += fmt.Sprintf(" AND status = ANY($%d)", argID)
+		query += fmt.Sprintf(" AND status::text = ANY($%d)", argID)
 		args = append(args, f.Statuses)
 		argID++
 	}
@@ -164,7 +164,7 @@ func (m *DataManager) GetRawMessagesData(ctx context.Context, f models.MessagesF
 
 // GetRawReactionsData — выборка реакций с учетом массивов reason[] и операторов
 func (m *DataManager) GetRawReactionsData(ctx context.Context, f models.ReactionsFilter) ([]models.Reaction, error) {
-	query := `SELECT id, claim_id, "like", reasons, operator_id FROM reactions WHERE 1=1`
+	query := `SELECT id, claim_id, "like", reasons::text[], operator_id FROM reactions WHERE 1=1`
 	args := []any{}
 	argID := 1
 
@@ -188,7 +188,7 @@ func (m *DataManager) GetRawReactionsData(ctx context.Context, f models.Reaction
 
 	// Пересечение массивов: проверяет совпадение любого из элементов reason[]
 	if len(f.Reasons) > 0 {
-		query += fmt.Sprintf(" AND reasons && $%d", argID)
+		query += fmt.Sprintf(" AND reasons::text[] && $%d", argID)
 		args = append(args, f.Reasons)
 		argID++
 	}

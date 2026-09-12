@@ -37,5 +37,5 @@ type Reaction struct {
 	ClaimID  int64    `json:"claim_id" db:"claim_id"`
 	Like     bool     `json:"like" db:"like"`
 	Reason   []Reason `json:"reason,omitempty" db:"reason"` // Изменено на массив reason[] миграцией #2
-	Operator *int64   `json:"operator" db:"operator_id"` // AI reactions have no human operator.
+	Operator *int64   `json:"operator" db:"operator_id"`    // AI reactions have no human operator.
 }
