@@ -26,3 +26,7 @@ databaseChangeLog:
   - include:
       file: 009-add-ai-row.sql
       relativeToChangelogFile: true
+  - include:
+      file: 010-dashboard-templates.sql
+      relativeToChangelogFile: true
+
