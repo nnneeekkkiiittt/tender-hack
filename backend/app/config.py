@@ -25,6 +25,9 @@ class Settings:
     demo_accounts: bool = field(default_factory=lambda: os.getenv("DEMO_ACCOUNTS", "false").lower() == "true")
     demo_seed: bool = field(default_factory=lambda: os.getenv("DEMO_SEED", "false").lower() == "true")
     auth_rate_limit: int = 30
+    moderation_url: str = field(default_factory=lambda: os.getenv('MODERATION_URL', ''))
+    moderation_api_key: str = field(default_factory=lambda: os.getenv('MODERATION_API_KEY', ''))
+    moderation_timeout: float = field(default_factory=lambda: float(os.getenv('MODERATION_TIMEOUT', '2')))
 
 
 COOKIE = "tender_session"

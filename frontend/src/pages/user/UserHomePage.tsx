@@ -35,7 +35,7 @@ export function UserHomePage() {
   const attempt = useRef<{ text: string; id: string } | null>(null),
     inFlight = useRef(false)
   const handleSend = async (text: string) => {
-    if (!user || inFlight.current) return
+    if (!user || inFlight.current) return false
     inFlight.current = true
     setQuestion(text)
     setBusy(true)
@@ -54,6 +54,8 @@ export function UserHomePage() {
       navigate('/tickets/' + ticket.id, { replace: true })
     } catch (e) {
       setError((e as Error).message)
+      setQuestion('')
+      return false
     } finally {
       inFlight.current = false
       setBusy(false)
@@ -87,13 +89,10 @@ export function UserHomePage() {
         {error && (
           <div role="alert" className="mt-4 text-sm text-accent">
             {error}
-            <button className="ml-3 underline" onClick={() => void handleSend(question)}>
-              Повторить отправку
-            </button>
           </div>
         )}
         <div className="mt-7">
-          <ChatInput onSend={handleSend} disabled={busy || !!error} autoFocus />
+          <ChatInput onSend={handleSend} disabled={busy} autoFocus />
         </div>
         {!question && (
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">

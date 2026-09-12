@@ -46,7 +46,12 @@ services:
       DEMO_SEED: ${DEMO_SEED:-false}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_TIMEOUT: ${AI_TIMEOUT:-420}
+      MODERATION_URL: http://moderation:8003/check
+      MODERATION_API_KEY: ${MODERATION_API_KEY:-${AI_API_KEY:-}}
+      MODERATION_TIMEOUT: ${MODERATION_TIMEOUT:-2}
     depends_on:
+      moderation:
+        condition: service_healthy
       liquibase:
         condition: service_completed_successfully
     ports:
@@ -56,6 +61,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  moderation:
+    build: ./moderation_service
+    restart: unless-stopped
+    environment:
+      MODERATION_API_KEY: ${MODERATION_API_KEY:-${AI_API_KEY:-}}
+      MODERATION_THREADS: "2"
+      OBSCENITY_THRESHOLD: ${OBSCENITY_THRESHOLD:-0.95}
+    volumes:
+      - ${MODERATION_MODEL_PATH:-./.demo/models/moderation}:/model:ro
+    healthcheck:
+      test: [CMD, .venv/bin/python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8003/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
 
   qdrant:
     profiles: [ml]

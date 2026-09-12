@@ -4,7 +4,7 @@ import { Plus, ArrowUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ChatInputProps {
-  onSend: (text: string) => void
+  onSend: (text: string) => void | boolean | Promise<void | boolean>
   disabled?: boolean
   placeholder?: string
   autoFocus?: boolean
@@ -18,13 +18,24 @@ export function ChatInput({
 }: ChatInputProps) {
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sending = useRef(false)
+  const [pending, setPending] = useState(false)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const trimmed = value.trim()
-    if (!trimmed || disabled) return
-    onSend(trimmed)
-    setValue('')
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    if (!trimmed || disabled || sending.current) return
+    sending.current = true
+    setPending(true)
+    try {
+      if (await onSend(trimmed) === false) return
+      setValue('')
+      if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    } catch {
+      // The page displays the API error; keep the user's draft intact.
+    } finally {
+      sending.current = false
+      setPending(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -62,13 +73,13 @@ export function ChatInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        disabled={disabled}
+        disabled={disabled || pending}
         className="max-h-40 flex-1 resize-none bg-transparent py-1 text-[15px] leading-relaxed text-ink placeholder:text-ink-muted focus:outline-none"
       />
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={!value.trim() || disabled}
+        disabled={!value.trim() || disabled || pending}
         className={cn(
           'mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors',
           value.trim() && !disabled

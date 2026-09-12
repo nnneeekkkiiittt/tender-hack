@@ -1,0 +1,23 @@
+[project]
+name = "tender-moderation"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+dependencies = ["fastapi>=0.121,<1", "uvicorn>=0.34,<1", "torch==2.8.0", "transformers==4.55.2"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110

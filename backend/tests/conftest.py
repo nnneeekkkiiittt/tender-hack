@@ -7,6 +7,13 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.moderation import Decision
+
+
+class AllowModeration:
+    """Explicit test double; production has no silent moderation bypass."""
+    def check(self, text):
+        return Decision(decision='ALLOW', reason=None, policy_version='test')
 
 
 @pytest.fixture(scope="session")
@@ -39,7 +46,8 @@ def env(database_url):
             ai_mode="mock",
             ai_url="",
             ai_api_key="",
-        )
+        ),
+        moderation_service=AllowModeration(),
     )
     clients = []
     with TestClient(app, headers={"X-Requested-With": "tender"}) as admin:

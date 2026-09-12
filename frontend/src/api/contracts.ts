@@ -100,6 +100,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message)
   }
@@ -126,14 +127,16 @@ export async function api<T>(
     const payload = await response.json().catch(() => null)
     const detail = payload?.detail
     const message =
-      typeof detail === 'string'
+      typeof detail?.message === 'string'
+        ? detail.message
+        : typeof detail === 'string'
         ? detail
         : Array.isArray(detail)
           ? detail.map((item: { msg: string }) => item.msg).join('; ')
           : `Ошибка сервера (${response.status})`
     if (response.status === 401 && !path.startsWith('/auth/'))
       window.dispatchEvent(new Event('session-expired'))
-    throw new ApiError(response.status, message)
+    throw new ApiError(response.status, message, typeof detail?.code === 'string' ? detail.code : undefined)
   }
   return response.status === 204 ? (undefined as T) : response.json()
 }

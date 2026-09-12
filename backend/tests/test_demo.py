@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from conftest import AllowModeration
 
 from app.config import COOKIE, Settings
 from app.main import create_app
@@ -13,7 +14,8 @@ def test_demo_disabled_by_default(env):
 def test_demo_switches_real_accounts_without_claim_leakage(env, database_url):
     _, _, make = env
     real, real_user = make("demo-admin")
-    app = create_app(Settings(database_url=database_url, demo_accounts=True, ai_mode="mock"))
+    app = create_app(Settings(database_url=database_url, demo_accounts=True, ai_mode="mock"),
+                     moderation_service=AllowModeration())
     with TestClient(app, headers={"X-Requested-With": "tender"}) as client:
         accounts = client.get("/api/auth/demo").json()
         assert {u["role"] for u in accounts} == {"admin", "supportL1", "supportL2", "supportL3", "user"}

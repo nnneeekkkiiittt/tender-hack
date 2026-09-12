@@ -39,7 +39,7 @@ export function UserTicketDetailPage() {
   })
 
   const handleSend = async (text: string) => {
-    if (!ticket || !user) return
+    if (!ticket || !user) return false
     setSending(true)
     setError('')
     try {
@@ -53,6 +53,7 @@ export function UserTicketDetailPage() {
       await invalidateTickets(queryClient, ticket.id)
     } catch (e) {
       setError((e as Error).message)
+      return false
     } finally {
       setSending(false)
     }
