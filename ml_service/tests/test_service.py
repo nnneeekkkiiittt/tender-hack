@@ -143,3 +143,18 @@ def test_ready_requires_indexed_documents(monkeypatch):
 
     monkeypatch.setattr("app.main.requests.get", response)
     assert TestClient(create_app()).get("/health/ready").status_code == 503
+
+
+def test_generator_cuts_off_chinese_degradation():
+    gen = AnswerGenerator()
+    gen.session = Mock()
+    mock_resp = Mock()
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "Шаг 1: перейдите в закупки. 参加者的问题: 如何参与采购?"}}]
+    }
+    mock_resp.raise_for_status = Mock()
+    gen.session.post.return_value = mock_resp
+
+    answer = gen.generate("Как принять участие?", [])
+    assert "Шаг 1: перейдите в закупки." in answer
+    assert "参加者的问题" not in answer
