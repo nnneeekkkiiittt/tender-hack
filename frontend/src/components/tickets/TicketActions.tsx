@@ -22,7 +22,7 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
   const active = ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS'
   const admin = user.role === 'ADMIN',
     owner = user.id === ticket.userId
-  const tierMatches = user.role === 'SUPPORT' && user.supportLevel === ticket.handlingLevel
+  const tierMatches = user.role === 'SUPPORT' && user.supportLevel === (ticket.handlingLevel ?? 1)
   const assigned = tierMatches && user.id === ticket.supportId
   const human = (ticket.handlingLevel ?? 1) > 0
   const employees = useQuery({
@@ -34,7 +34,7 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
     setBusy(true)
     setError('')
     try {
-      if (path === '/escalate') await ticketRepository.escalate(ticket.id, ticket.handlingLevel!)
+      if (path === '/escalate') await ticketRepository.escalate(ticket.id, ticket.handlingLevel ?? 1)
       else await api('/tickets/' + ticket.id + path, 'PATCH', body)
       await invalidateTickets(cache, ticket.id)
     } catch (e) {
@@ -47,19 +47,20 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
     setBusy(true)
     setError('')
     try {
+      const currentLvl = ticket.handlingLevel ?? 1
       if (comment?.trim()) {
         await ticketRepository.sendMessage({
           ticketId: ticket.id,
           authorId: user.id,
           authorName: user.name,
           authorRole: 'SUPPORT',
-          content: `[Передача на L${ticket.handlingLevel! + 1}]: ${comment.trim()}`,
+          content: `[Передача на L${currentLvl + 1}]: ${comment.trim()}`,
         })
       }
       if (!ticket.supportId) {
         await ticketRepository.assign(ticket.id, user.id, user.name)
       }
-      await ticketRepository.escalate(ticket.id, ticket.handlingLevel!)
+      await ticketRepository.escalate(ticket.id, currentLvl)
       await invalidateTickets(cache, ticket.id)
       setEscalateOpen(false)
     } catch (e) {
@@ -167,20 +168,20 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
             onClick={() => setEscalateOpen(true)}
           >
             <ArrowUpRight className="h-4 w-4" />
-            {ticket.handlingLevel === 1 ? 'Передать на 2-ю линию (L2)' : 'Передать на 3-ю линию (L3)'}
+            {(ticket.handlingLevel ?? 1) === 1 ? 'Передать на 2-ю линию (L2)' : 'Передать на 3-ю линию (L3)'}
           </Button>
           <EscalateModal
             open={escalateOpen}
             onClose={() => setEscalateOpen(false)}
             onConfirm={handleEscalate}
-            currentLevel={ticket.handlingLevel!}
-            targetLevel={ticket.handlingLevel! + 1}
+            currentLevel={ticket.handlingLevel ?? 1}
+            targetLevel={(ticket.handlingLevel ?? 1) + 1}
             ticketNumber={ticket.number}
             busy={busy}
           />
         </>
       )}
-      {active && tierMatches && ticket.handlingLevel === 3 && (
+      {active && tierMatches && (ticket.handlingLevel ?? 1) === 3 && (
         <div className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-gray-50/80 px-3 py-2 text-xs text-ink-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-secondary" />
           <span>Финальная линия поддержки (L3)</span>
