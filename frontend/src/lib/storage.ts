@@ -37,4 +37,5 @@ export const DEMO_STORAGE_KEYS = {
   tickets: 'th_demo_tickets',
   employees: 'th_demo_employees',
   users: 'th_demo_users',
+  dashboards: 'th_demo_dashboards',
 } as const

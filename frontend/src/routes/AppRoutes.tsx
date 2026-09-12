@@ -27,6 +27,9 @@ import { AdminTicketDetailPage } from '@/pages/admin/AdminTicketDetailPage'
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
 import { AdminEmployeesPage } from '@/pages/admin/AdminEmployeesPage'
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage'
+import { DashboardListPage } from '@/pages/admin/dashboards/DashboardListPage'
+import { DashboardBuilderPage } from '@/pages/admin/dashboards/DashboardBuilderPage'
+import { DashboardViewPage } from '@/pages/admin/dashboards/DashboardViewPage'
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage'
 
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -91,10 +94,11 @@ export function AppRoutes() {
           <Route path="/admin/tickets/:id" element={<AdminTicketDetailPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/employees" element={<AdminEmployeesPage />} />
-          <Route
-            path="/admin/analytics"
-            element={isDemoMode ? <AdminAnalyticsPage /> : <UnavailableState title="Аналитика" />}
-          />
+          <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+          <Route path="/admin/analytics/dashboards" element={<DashboardListPage />} />
+          <Route path="/admin/analytics/dashboards/new" element={<DashboardBuilderPage />} />
+          <Route path="/admin/analytics/dashboards/:id" element={<DashboardViewPage />} />
+          <Route path="/admin/analytics/dashboards/:id/edit" element={<DashboardBuilderPage />} />
           <Route path="/admin/settings" element={<AdminSettingsPage />} />
         </Route>
       </Route>

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	datamanager "analytics/internal/data_manager"
+	"analytics/internal/metabase"
 	"analytics/internal/models"
 )
 
@@ -21,10 +22,15 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 type Handler struct {
 	dm *datamanager.DataManager
+	mb *metabase.Service
 }
 
-func NewHandler(dm *datamanager.DataManager) *Handler {
-	return &Handler{dm: dm}
+// NewHandler wires the raw-data/metrics handlers. mb may be nil if Metabase
+// integration is not configured — dashboard handlers degrade gracefully
+// (widgets are still saved; embed URLs/card provisioning simply report that
+// Metabase isn't configured instead of panicking).
+func NewHandler(dm *datamanager.DataManager, mb *metabase.Service) *Handler {
+	return &Handler{dm: dm, mb: mb}
 }
 
 // GetRawUsersData — GET /api/v1/analytics/users?user_ids=1,2,3&roles=admin,user&limit=100&offset=0
