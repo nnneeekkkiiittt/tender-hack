@@ -40,6 +40,12 @@ Later runs reuse saved ports. Use `--state-dir /absolute/path --project another-
 for a separate installation; each installation needs a unique Compose project and ports.
 `--model-cache /path` optionally reuses verified files arranged as `e5/` and `qwen/`.
 
+The analytics service from upstream main is retained under the optional
+`analytics` Compose profile (loopback port 8081). Its raw-data queries support
+the current schema, including nullable operators on AI reactions. It is not
+connected to the frontend statistics screens and has no public authentication;
+do not expose it externally.
+
 All published ports bind to loopback by default. Password-free demo switching
 grants administrator access; exposing it is an explicit operator decision, not
 a production-safe configuration. The public server's settings and passwords are

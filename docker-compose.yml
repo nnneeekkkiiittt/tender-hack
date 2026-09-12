@@ -151,6 +151,24 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:80"
+  analytics:
+    profiles: [analytics]
+    build:
+      context: ./analytics
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:${ANALYTICS_PORT:-8081}:8080"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_NAME=tender-hack
+    depends_on:
+      postgres:
+        condition: service_healthy
+      liquibase:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
