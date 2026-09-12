@@ -146,7 +146,7 @@ services:
       EMBEDDING_PREFIX: "query: "
       COLLECTION_L1: manuals_e5_v1
       COLLECTION_L2: manuals_e5_v1
-      SCORE_THRESHOLD: "0.82"
+      SCORE_THRESHOLD: "0.70"
       REQUEST_TIMEOUT: "240"
       KB_PATH: /knowledge/dense_kb_v1
     volumes:
