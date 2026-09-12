@@ -7,7 +7,13 @@ import (
 	"strings"
 )
 
-// --- Вспомогательные функции (Helpers) ---
+func respondJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		return
+	}
+}
 
 func parseQueryInt(val string, defaultVal int) int {
 	if val == "" {
@@ -19,21 +25,36 @@ func parseQueryInt(val string, defaultVal int) int {
 	return defaultVal
 }
 
+func parseQueryInt64(val string, defaultVal int64) int64 {
+	if val == "" {
+		return defaultVal
+	}
+	if res, err := strconv.ParseInt(val, 10, 64); err == nil && res > 0 {
+		return res
+	}
+	return defaultVal
+}
+
 func parseQueryInt64Slice(val string) []int64 {
-	var result []int64
-	items := strings.SplitSeq(val, ",")
-	for item := range items {
-		if num, err := strconv.ParseInt(strings.TrimSpace(item), 10, 64); err == nil {
-			result = append(result, num)
+	parts := splitCSV(val)
+	result := make([]int64, 0, len(parts))
+	for _, part := range parts {
+		id, err := strconv.ParseInt(part, 10, 64)
+		if err == nil {
+			result = append(result, id)
 		}
 	}
 	return result
 }
 
-func respondJSON(w http.ResponseWriter, code int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	if payload != nil {
-		_ = json.NewEncoder(w).Encode(payload)
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
 	}
+	return result
 }
