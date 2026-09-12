@@ -14,13 +14,15 @@ type User struct {
 
 // Claim соответствует таблице 'claims'
 type Claim struct {
-	ID         int64   `json:"id" db:"id"`
-	AuthorID   int64   `json:"author_id" db:"author_id"`
-	Title      string  `json:"title" db:"title"`
-	Topic      *string `json:"topic,omitempty" db:"topic"`       // Указатель, так как поле NULLable
-	Subtopic   *string `json:"subtopic,omitempty" db:"subtopic"` // Указатель, так как поле NULLable
-	Status     Status  `json:"status" db:"status"`
-	OperatorID []int64 `json:"operator_id,omitempty" db:"operator_id"` // Массив BIGINT[] в Postgres
+	ID           int64     `json:"id" db:"id"`
+	AuthorID     int64     `json:"author_id" db:"author_id"`
+	Title        string    `json:"title" db:"title"`
+	Topic        *string   `json:"topic,omitempty" db:"topic"`       // Указатель, так как поле NULLable
+	Subtopic     *string   `json:"subtopic,omitempty" db:"subtopic"` // Указатель, так как поле NULLable
+	Status       Status    `json:"status" db:"status"`
+	OperatorID   []int64   `json:"operator_id,omitempty" db:"operator_id"` // Массив BIGINT[] в Postgres
+	RegisteredAt time.Time `json:"created_at" db:"created_at"`
+	ResolvedAt   time.Time `json:"resolved_at" db:"resolved_at"`
 }
 
 // Message соответствует таблице 'messages'
@@ -29,6 +31,7 @@ type Message struct {
 	ClaimID int64     `json:"claim_id" db:"claim_id"`
 	Text    string    `json:"text" db:"text"`
 	SentAt  time.Time `json:"sent_at" db:"sent_at"`
+	Author  int64     `json:"author" db:"author"`
 }
 
 // Reaction соответствует таблице 'reactions' с учетом всех миграций
