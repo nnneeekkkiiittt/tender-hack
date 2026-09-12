@@ -143,3 +143,31 @@ def test_ready_requires_indexed_documents(monkeypatch):
 
     monkeypatch.setattr("app.main.requests.get", response)
     assert TestClient(create_app()).get("/health/ready").status_code == 503
+
+
+def test_generator_cuts_off_chinese_degradation():
+    gen = AnswerGenerator()
+    gen.session = Mock()
+    mock_resp = Mock()
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": "Шаг 1: перейдите в закупки. 参加者的问题: 如何参与采购?"}}]
+    }
+    mock_resp.raise_for_status = Mock()
+    gen.session.post.return_value = mock_resp
+
+    answer = gen.generate("Как принять участие?", [])
+    assert "Шаг 1: перейдите в закупки." in answer
+
+def test_keyword_match_for_error_code():
+    retriever = KBRetriever.__new__(KBRetriever)
+    chunk = RetrievedChunk(
+        text="При ошибке РДИК_0217 нажмите кнопку обновить.",
+        doc_name="Инструкция",
+        breadcrumb="Раздел 8.5",
+        page=67,
+    )
+    retriever._cached_chunks = [(chunk, chunk.text.lower(), chunk.breadcrumb.lower())]
+    matches = retriever._search_keyword_matches("ошибка РДИК_0217", "manuals_e5_v1")
+    assert len(matches) == 1
+    assert matches[0].page == 67
+    assert "РДИК_0217" in matches[0].text

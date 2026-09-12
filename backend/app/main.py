@@ -17,9 +17,11 @@ from .config import Settings
 from .db import DB
 from .limits import RequestLimit
 from .models import Credentials
+from .moderation import HttpModerationService, ModerationService
 
 
-def create_app(settings=None, ai_service: AiService | None = None):
+def create_app(settings=None, ai_service: AiService | None = None,
+               moderation_service: ModerationService | None = None):
     settings = settings or Settings()
     if settings.ai_mode not in {"http", "mock"}:
         raise ValueError("AI_MODE must be 'http' or 'mock'")
@@ -63,6 +65,10 @@ def create_app(settings=None, ai_service: AiService | None = None):
                         "UPDATE auth_sessions SET revoked_at = clock_timestamp() WHERE revoked_at IS NULL AND user_id IN (SELECT user_id FROM demo_accounts)"
                     )
             with ExitStack() as stack:
+                moderation_client = stack.enter_context(httpx.Client(
+                    timeout=httpx.Timeout(settings.moderation_timeout, connect=1), follow_redirects=False))
+                app.state.moderation_service = moderation_service if moderation_service is not None else (
+                    HttpModerationService(moderation_client, settings.moderation_url, settings.moderation_api_key))
                 if ai_service is not None:
                     app.state.ai_service = ai_service
                 elif settings.ai_mode == "mock":

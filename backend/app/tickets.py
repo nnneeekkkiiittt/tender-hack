@@ -21,6 +21,7 @@ from .models import (
     Topic,
 )
 from .reactions import read_reaction, save_reaction
+from .moderation import require_allowed
 
 router = APIRouter()
 SELECT_TICKET = """SELECT c.*, a.name AS author_name, o.name AS operator_name
@@ -126,6 +127,13 @@ def list_tickets(
 def create_ticket(body: TicketCreate, user: CurrentUser, conn: DB, request: Request):
     if user["role"] != "user":
         raise HTTPException(403, "Only users create claims")
+    existing = conn.execute(
+        'SELECT id FROM claims WHERE author_id = %s AND request_id = %s',
+        (user['id'], body.request_id),
+    ).fetchone()
+    if existing:
+        return serialize(load_ticket(conn, existing['id'], user))
+    require_allowed(request.app.state.moderation_service, body.text)
     row = conn.execute(
         """INSERT INTO claims(author_id, title, topic, request_id)
         VALUES (%s, %s, %s, %s) ON CONFLICT (author_id, request_id) DO NOTHING RETURNING id""",
@@ -197,7 +205,11 @@ def messages(
 
 
 @router.post("/tickets/{ticket_id}/messages", response_model=Ticket, status_code=201)
-def send_message(ticket_id: Identifier, body: MessageCreate, user: CurrentUser, conn: DB):
+def send_message(ticket_id: Identifier, body: MessageCreate, user: CurrentUser, conn: DB, request: Request):
+    if user['role'] == 'user':
+        active(load_ticket(conn, ticket_id, user))
+        require_allowed(request.app.state.moderation_service, body.text)
+    # Recheck state under the lock after the external moderation request.
     row = load_ticket(conn, ticket_id, user, lock=True)
     active(row)
     if user["role"] in SUPPORT_ROLES:

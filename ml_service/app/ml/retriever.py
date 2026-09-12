@@ -137,14 +137,95 @@ class KBRetriever:
             logger.error(f"Ошибка получения эмбеддингов через TEI ({embed_url}): {e}")
             raise RuntimeError("Embedding service unavailable") from e
 
+    def _load_cache_if_needed(self, collection_name: str) -> None:
+        """Предзагружает текстовые пейлоады коллекции в память для мгновенного точного поиска."""
+        if hasattr(self, "_cached_collection") and self._cached_collection == collection_name and hasattr(self, "_cached_chunks") and self._cached_chunks:
+            return
+        client = getattr(self, "client", None)
+        if client is None or not hasattr(client, "scroll"):
+            return
+        try:
+            points, _ = self.client.scroll(
+                collection_name=collection_name,
+                limit=3000,
+                with_payload=True,
+                with_vectors=False,
+            )
+            cached = []
+            for point in points:
+                payload = point.payload or {}
+                text = payload.get("page_content") or payload.get("text", "")
+                if not text:
+                    continue
+                chunk = RetrievedChunk(
+                    text=text,
+                    doc_name=payload.get("doc_name", "Регламент"),
+                    breadcrumb=payload.get("breadcrumb", ""),
+                    page=payload.get("page"),
+                    page_end=payload.get("page_end"),
+                    edition=payload.get("edition"),
+                    score=1.0,
+                    support_line=payload.get("support_line", "L2"),
+                )
+                cached.append((chunk, text.lower(), (payload.get("breadcrumb") or "").lower()))
+            self._cached_chunks = cached
+            self._cached_collection = collection_name
+            logger.info(f"Загружено {len(cached)} чанков в кэш поиска для коллекции '{collection_name}'")
+        except Exception as e:
+            logger.warning(f"Не удалось предзагрузить чанки коллекции '{collection_name}': {e}")
+            self._cached_chunks = []
+
+    def _search_keyword_matches(self, query: str, collection_name: str) -> List[RetrievedChunk]:
+        """Быстрый поиск по точным кодам ошибок, номерам статей и ключевым терминам."""
+        self._load_cache_if_needed(collection_name)
+        if not getattr(self, "_cached_chunks", None):
+            return []
+
+        q_lower = query.lower()
+        raw_codes = re.findall(r"[а-яА-ЯёЁa-zA-Z0-9_-]+", q_lower)
+        codes = [c for c in raw_codes if len(c) >= 4 or c in ("мчд", "эцп", "скзи", "аис", "еис")]
+
+        patterns = list(codes)
+        digits = re.findall(r"\d{3,4}", q_lower)
+        if "рдик" in q_lower and digits:
+            for d in digits:
+                patterns.append(f"рдик_{d}")
+                patterns.append(d)
+
+        matches = []
+        for chunk, text_lower, breadcrumb_lower in self._cached_chunks:
+            score = 0.0
+            for p in patterns:
+                if p in text_lower or p in breadcrumb_lower:
+                    score += 0.5 if len(p) <= 4 else 1.0
+
+            if len(codes) >= 2 and all(c in text_lower or c in breadcrumb_lower for c in codes):
+                score += 0.5
+
+            if score > 0.0:
+                matched_chunk = RetrievedChunk(
+                    text=chunk.text,
+                    doc_name=chunk.doc_name,
+                    breadcrumb=chunk.breadcrumb,
+                    page=chunk.page,
+                    page_end=chunk.page_end,
+                    edition=chunk.edition,
+                    score=min(1.0, 0.85 + score * 0.1),
+                    support_line=chunk.support_line,
+                )
+                matches.append((score, matched_chunk))
+
+        matches.sort(key=lambda x: x[0], reverse=True)
+        return [m[1] for m in matches[:4]]
+
     def search(
         self, query: str, line: SupportLine = SupportLine.L2, limit: Optional[int] = None
     ) -> List[RetrievedChunk]:
         """
-        Многоаспектный поиск с Query Expansion и Reciprocal Rank Fusion (RRF):
-        1. Расширяет запрос до 2-3 каноничных терминологических вариантов
-        2. Ищет по каждому вектору в Qdrant
-        3. Объединяет результаты через формулу RRF и удаляет дубли
+        Многоаспектный гибридный поиск:
+        1. Точный поиск по кодам ошибок (РДИК_..., DIT_PP, 44-ФЗ и др.)
+        2. Query Expansion и плотный векторный поиск в Qdrant
+        3. Reciprocal Rank Fusion (RRF) слияние и адаптивное отсечение
         """
         if self.client is None:
             logger.error("QdrantClient не инициализирован.")
@@ -166,25 +247,36 @@ class KBRetriever:
                     logger.warning(f"Коллекция '{collection_name}' отсутствует в Qdrant.")
                     return []
 
-            # 2. Query Expansion (расширение до 2-3 формулировок)
+            merged_results: Dict[str, Dict[str, Any]] = {}
+            rrf_k = 60
+
+            # 2. Точный поиск по кодам и ключевым словам (Hybrid retrieval)
+            kw_chunks = self._search_keyword_matches(query, collection_name)
+            for rank, kw_chunk in enumerate(kw_chunks):
+                chunk_key = f"{kw_chunk.doc_name}:{kw_chunk.page}:{kw_chunk.text[:100]}"
+                merged_results[chunk_key] = {
+                    "chunk": kw_chunk,
+                    "rrf_score": 1.0 / (rank + 1),
+                    "max_score": kw_chunk.score,
+                    "is_keyword_match": True,
+                }
+
+            # 3. Query Expansion (расширение до 2-3 формулировок)
             search_queries = self.expand_query(query)
             logger.info(f"Поисковые запросы RAG ({len(search_queries)}): {search_queries}")
 
-            # 3. Пакетный эмбеддинг всех запросов
+            # 4. Пакетный эмбеддинг всех запросов
             query_vectors = self.embed_queries_batch(search_queries)
 
-            # 4. Выполняем поиск по каждому запросу и собираем ранги
-            # doc_id / text_hash -> {chunk, rrf_score, best_raw_score}
-            merged_results: Dict[str, Dict[str, Any]] = {}
-            rrf_k = 60  # Константа RRF
-
+            # 5. Выполняем поиск по каждому вектору в Qdrant
+            effective_search_threshold = max(0.35, min(self.score_threshold, 0.70) - 0.1)
             for q_idx, vector in enumerate(query_vectors):
                 if hasattr(self.client, "query_points"):
                     res = self.client.query_points(
                         collection_name=collection_name,
                         query=vector,
                         limit=max(16, k * 2),
-                        score_threshold=max(0.35, self.score_threshold - 0.1),
+                        score_threshold=effective_search_threshold,
                         with_payload=True,
                     )
                     points = res.points
@@ -193,7 +285,7 @@ class KBRetriever:
                         collection_name=collection_name,
                         query_vector=vector,
                         limit=max(16, k * 2),
-                        score_threshold=max(0.35, self.score_threshold - 0.1),
+                        score_threshold=effective_search_threshold,
                     )
 
                 for rank, point in enumerate(points):
@@ -202,7 +294,6 @@ class KBRetriever:
                     if not text:
                         continue
 
-                    # Уникальный ключ фрагмента (хэш текста или путь + страница)
                     chunk_key = f"{payload.get('doc_name')}:{payload.get('page')}:{text[:100]}"
                     rrf_contribution = 1.0 / (rrf_k + rank + 1)
                     raw_score = float(point.score)
@@ -221,6 +312,7 @@ class KBRetriever:
                             ),
                             "rrf_score": rrf_contribution,
                             "max_score": raw_score,
+                            "is_keyword_match": False,
                         }
                     else:
                         merged_results[chunk_key]["rrf_score"] += rrf_contribution
@@ -231,11 +323,12 @@ class KBRetriever:
             if not merged_results:
                 return []
 
-            # 5. Сортировка по комбинации RRF скора и максимальной косинусной близости
+            # 6. Сортировка по комбинации RRF скора, косинусной близости и совпадению заголовка
             ranked_items = sorted(
                 merged_results.values(),
                 key=lambda x: (
-                    (x["rrf_score"] * 0.7)
+                    (1.5 if x.get("is_keyword_match") else 0.0)
+                    + (x["rrf_score"] * 0.7)
                     + (x["max_score"] * 0.3)
                     + heading_match(query, x["chunk"].breadcrumb)
                     + (0.006 if x["chunk"].edition else 0)
@@ -243,10 +336,11 @@ class KBRetriever:
                 reverse=True,
             )
 
-            # Отсекаем по финальному порогу релевантности и лимиту k
+            # Отсекаем по адаптивному порогу релевантности и лимиту k
+            effective_threshold = min(self.score_threshold, 0.70)
             final_chunks: List[RetrievedChunk] = []
             for item in ranked_items[:k]:
-                if item["max_score"] >= self.score_threshold:
+                if item.get("is_keyword_match") or item["max_score"] >= effective_threshold:
                     final_chunks.append(item["chunk"])
 
             return final_chunks

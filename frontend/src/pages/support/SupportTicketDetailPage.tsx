@@ -70,7 +70,7 @@ export function SupportTicketDetailPage() {
   const invalidate = () => invalidateTickets(queryClient, id)
 
   const handleSend = async (text: string) => {
-    if (!ticket || !user) return
+    if (!ticket || !user) return false
     setSending(true)
     setError('')
     try {
@@ -87,6 +87,7 @@ export function SupportTicketDetailPage() {
       await invalidate()
     } catch (e) {
       setError((e as Error).message)
+      return false
     } finally {
       setSending(false)
     }

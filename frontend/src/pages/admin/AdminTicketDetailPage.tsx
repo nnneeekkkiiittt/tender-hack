@@ -110,6 +110,7 @@ export function AdminTicketDetailPage() {
                     await refetch()
                   } catch (e) {
                     setError((e as Error).message)
+                    return false
                   } finally {
                     setBusy(false)
                   }

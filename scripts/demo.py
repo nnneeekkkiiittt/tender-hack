@@ -107,6 +107,8 @@ def configuration(args, state):
     # Reuse stored credentials/ports; never silently reset an existing installation.
     values.update(COMPOSE_PROFILES='' if args.mock else 'ml', AI_MODE='mock' if args.mock else 'http',
                   AI_URL='' if args.mock else 'http://ml:8001/ask')
+    values['MODERATION_MODEL_PATH'] = str(state / 'models/moderation')
+    values['WEB_BIND'] = '127.0.0.1'
     target.write_text(''.join(f'{key}={value}\n' for key, value in values.items()))
     target.chmod(0o600)
     return values
@@ -114,7 +116,7 @@ def configuration(args, state):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--mock', action='store_true', help='Skip ML assets; clearly labelled mock AI')
+    parser.add_argument('--mock', action='store_true', help='Mock answering AI; real CPU moderation remains enabled')
     parser.add_argument('--state-dir', type=Path, default=ROOT / '.demo')
     parser.add_argument('--project', default='tender-demo')
     parser.add_argument('--port', type=int, default=8080)
@@ -134,6 +136,9 @@ def main():
         subprocess.run(compose + list(command), cwd=ROOT, env=env, check=True)
 
     run('version')
+    lock = json.loads((ROOT / 'assets/moderation.lock.json').read_text())
+    for asset in lock['models']:
+        fetch(asset, state / 'models/moderation' / asset['path'])
     if not args.mock:
         lock = json.loads((ROOT / 'assets/models.lock.json').read_text())
         knowledge(state, lock)

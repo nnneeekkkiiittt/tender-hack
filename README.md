@@ -20,8 +20,9 @@ L1, L2, L3, resolved with feedback), models and manual index are set up automati
 Create a **new question** to test real inference: sample messages are fixtures,
 not model outputs. No accounts or live database need to be copied from a server.
 
-For an operational demo without model downloads: `./scripts/demo-up.sh --mock`.
-Only AI is mocked and explicitly labelled; the database and permissions are real.
+For an operational demo without answering-model downloads: `./scripts/demo-up.sh --mock`.
+Only answering AI is mocked and explicitly labelled; moderation still downloads its 48 MB CPU model.
+The database and permissions are real.
 Running without `--mock` selects real ML again. There is no silent mock fallback.
 
 The launcher creates `.demo/config.env` with random credentials (0600), extracts
@@ -46,7 +47,8 @@ the current schema, including nullable operators on AI reactions. It is not
 connected to the frontend statistics screens and has no public authentication;
 do not expose it externally.
 
-All published ports bind to loopback by default. Password-free demo switching
+The demo launcher binds all published ports to loopback. Direct Compose startup publishes the frontend
+on port 80; set `WEB_BIND=127.0.0.1` for localhost-only access. Password-free demo switching
 grants administrator access; exposing it is an explicit operator decision, not
 a production-safe configuration. The public server's settings and passwords are
 not part of this repository. Statistics remain a separate optional service.
@@ -65,8 +67,8 @@ parallel, give each a separate `--output` directory to avoid trace-file collisio
 ## Manual developer setup
 
 1. Create `.env` from `.env.example` and set a strong `BOOTSTRAP_ADMIN_PASSWORD` (at least 10 characters).
-2. Run `docker compose up --build -d`.
-3. Open [the application](http://localhost:8080). Register a user, or sign in with your bootstrap administrator to create support accounts.
+2. Run `python3 scripts/prepare-moderation.py`, then `docker compose up --build -d`.
+3. Open [the application](http://localhost). Register a user, or sign in with your bootstrap administrator to create support accounts. Set `ALLOWED_ORIGINS=http://localhost` (or the actual public origin) in `.env`.
 
 The API and interactive contract are at [localhost:8000/docs](http://localhost:8000/docs). Liquibase runs before the backend starts. The bootstrap account is created only when no administrator exists; changing bootstrap environment variables does not reset existing passwords.
 
@@ -89,6 +91,11 @@ See [the feature spec](FEATURE_SPEC.md) and [database notes](db/README.md). Open
 
 ## AI integration
 
+All user questions and follow-ups first pass through the separate CPU moderation service.
+Blocked messages return `MESSAGE_BLOCKED` without writes, AI calls or escalation; the draft remains
+editable. Service failures return retryable `MODERATION_UNAVAILABLE`, not an accusation of profanity.
+Policy, model limitations, contracts and tests: [moderation_service/README.md](moderation_service/README.md).
+
 The local ML setup is documented in [ml_service/README.md](ml_service/README.md). Set `AI_URL` to the exact upstream POST endpoint. The backend sends `{"question":"..."}` and expects `{"answer":"...","sources":["..."]}`. `AI_API_KEY`, if set, is sent as a Bearer token server-side and never exposed to the browser. The local CPU profile allows up to 420 seconds (AI_TIMEOUT); no mock response is substituted on failure.
 
 One chat follows AI → L1 → L2 → L3. The initial question creates a claim and stores one AI answer. An ML escalation decision sends the same chat directly to L1/L2/L3. Otherwise, a dislike or any user follow-up sends it to L1. Only the assigned operator can escalate L1/L2 to the next tier; L3 is final. All messages remain in the same history. If AI is unavailable, the question and a system notice persist; a follow-up still reaches L1.
@@ -98,6 +105,11 @@ For local AI mocking, set `AI_MODE=mock` in `.env` and recreate the backend with
 ## Development
 
 With PostgreSQL and Liquibase running, use `uv sync --project backend`. Then, from `backend/`, run `uv run uvicorn app.main:app --reload`. `DATABASE_URL` defaults to the local Compose database on port 5433.
+
+For a backend running outside Docker, also run moderation locally: from `moderation_service/`, use
+`MODERATION_MODEL_PATH=../.demo/models/moderation uv run uvicorn app.main:app --host 127.0.0.1 --port 8003`.
+Set the backend's `MODERATION_URL=http://127.0.0.1:8003/check` and matching `MODERATION_API_KEY`
+for both processes. The Compose-only hostname `moderation` is not resolvable from the host.
 
 From `frontend/`, run `npm ci --registry=https://registry.npmjs.org` and `npm run dev`. Vite proxies `/api` to localhost:8000. API mode is the default. Set `VITE_APP_MODE=demo` only to view the explicitly labelled legacy mock UI. Both Python and npm dependencies are locked; after changing Python dependencies, regenerate Docker requirements with `uv export --project backend --no-dev --format requirements-txt --output-file backend/requirements.txt`.
 
