@@ -29,7 +29,7 @@ func (m *DataManager) GetRawUsersData(ctx context.Context, f models.UsersFilter)
 	}
 
 	if len(f.Roles) > 0 {
-		query += fmt.Sprintf(" AND role = ANY($%d)", argID)
+		query += fmt.Sprintf(" AND role::text = ANY($%d)", argID)
 		args = append(args, f.Roles)
 		argID++
 	}
@@ -57,7 +57,10 @@ func (m *DataManager) GetRawUsersData(ctx context.Context, f models.UsersFilter)
 
 // GetRawClaimsData — выборка обращений (claims) с обработкой BIGINT[] operator_id
 func (m *DataManager) GetRawClaimsData(ctx context.Context, f models.ClaimsFilter) ([]models.Claim, error) {
-	query := `SELECT id, author_id, title, topic, subtopic, status, operator_id FROM claims WHERE 1=1`
+	// Preserve the analytics array-shaped response over the operational scalar assignment.
+	query := `SELECT id, author_id, title, topic, subtopic, status,
+        CASE WHEN operator_id IS NULL THEN '{}'::bigint[] ELSE ARRAY[operator_id] END
+        FROM claims WHERE 1=1`
 	args := []any{}
 	argID := 1
 
@@ -74,7 +77,7 @@ func (m *DataManager) GetRawClaimsData(ctx context.Context, f models.ClaimsFilte
 	}
 
 	if len(f.Statuses) > 0 {
-		query += fmt.Sprintf(" AND status = ANY($%d)", argID)
+		query += fmt.Sprintf(" AND status::text = ANY($%d)", argID)
 		args = append(args, f.Statuses)
 		argID++
 	}
@@ -87,7 +90,7 @@ func (m *DataManager) GetRawClaimsData(ctx context.Context, f models.ClaimsFilte
 
 	// Пересечение массивов: проверяет, входит ли хотя бы один оператор из фильтра в массив operator_id
 	if len(f.OperatorIDs) > 0 {
-		query += fmt.Sprintf(" AND operator_id && $%d", argID)
+		query += fmt.Sprintf(" AND operator_id = ANY($%d)", argID)
 		args = append(args, f.OperatorIDs)
 		argID++
 	}
@@ -161,7 +164,7 @@ func (m *DataManager) GetRawMessagesData(ctx context.Context, f models.MessagesF
 
 // GetRawReactionsData — выборка реакций с учетом массивов reason[] и операторов
 func (m *DataManager) GetRawReactionsData(ctx context.Context, f models.ReactionsFilter) ([]models.Reaction, error) {
-	query := `SELECT id, claim_id, "like", reason, "operator" FROM reactions WHERE 1=1`
+	query := `SELECT id, claim_id, "like", reasons::text[], operator_id FROM reactions WHERE 1=1`
 	args := []any{}
 	argID := 1
 
@@ -172,7 +175,7 @@ func (m *DataManager) GetRawReactionsData(ctx context.Context, f models.Reaction
 	}
 
 	if len(f.OperatorIDs) > 0 {
-		query += fmt.Sprintf(" AND \"operator\" = ANY($%d)", argID)
+		query += fmt.Sprintf(" AND operator_id = ANY($%d)", argID)
 		args = append(args, f.OperatorIDs)
 		argID++
 	}
@@ -185,7 +188,7 @@ func (m *DataManager) GetRawReactionsData(ctx context.Context, f models.Reaction
 
 	// Пересечение массивов: проверяет совпадение любого из элементов reason[]
 	if len(f.Reasons) > 0 {
-		query += fmt.Sprintf(" AND reason && $%d", argID)
+		query += fmt.Sprintf(" AND reasons::text[] && $%d", argID)
 		args = append(args, f.Reasons)
 		argID++
 	}

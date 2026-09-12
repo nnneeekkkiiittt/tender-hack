@@ -2,15 +2,24 @@ databaseChangeLog:
   - include:
       file: 001-init.sql
       relativeToChangelogFile: true
-    
   - include:
-      file: 002-operator-field.sql
+      file: 002-claim-history.sql
       relativeToChangelogFile: true
-
   - include:
-      file: 003-message-author.sql
+      file: 003-auth-sessions.sql
       relativeToChangelogFile: true
-
   - include:
-      file: 004-timestamps-claims.sql
-      relativeToChangelohFile: true
+      file: 004-unified-chat.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 005-demo-accounts.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 006-unified-reactions.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 007-reaction-reasons.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 008-ml-routing.sql
+      relativeToChangelogFile: true
