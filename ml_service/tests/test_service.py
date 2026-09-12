@@ -242,3 +242,16 @@ def test_keyword_match_ignores_stopwords():
     assert len(matches_ecp) >= 1
     assert "ЭЦП" in matches_ecp[0].text
 
+
+def test_clean_text_removes_figures_and_markdown():
+    from app.ml.generator import clean_text
+
+    raw = "1. **Нажмите кнопку** «Подать предложение» (Рисунок 545 (3)). Затем (Рисунок 546)."
+    cleaned = clean_text(raw)
+    assert "**" not in cleaned
+    assert "Нажмите кнопку" in cleaned
+    assert "Рисунок" not in cleaned
+    assert "(3)" not in cleaned
+    assert cleaned.endswith(".")
+
+

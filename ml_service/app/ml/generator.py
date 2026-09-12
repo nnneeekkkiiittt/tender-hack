@@ -18,10 +18,37 @@ GENERATOR_SYSTEM_PROMPT = """Ты — эксперт службы поддерж
 Отвечай структурированно, грамотно и только на русском языке.
 Правила ответа:
 1. Используй факты из предоставленного текста регламентов и инструкций.
-2. Если вопрос общий (например, о документах, регистрации, участии в закупках, электронной подписи), обобщи правила и требования в виде четкого понятного списка шагов или пунктов.
-3. Если вопрос про конкретную ошибку интерфейса, назови точное действие (какую кнопку нажать, что обновить).
-4. Не выдумывай факты, которых нет в регламентах.
-5. Напиши [NO_CONTEXT] только в том случае, если предоставленный текст вообще никак не относится к вопросу пользователя."""
+2. Отвечай простым текстом без markdown разметки: НЕ используй звёздочки **, решётки #, нижние подчёркивания _. Для пунктов используй обычную нумерацию: 1., 2., 3. и дефисы для подпунктов: -.
+3. НЕ упоминай номера рисунков, схем, иллюстраций и таблиц (например, не пиши «(Рисунок 123)»), так как пользователь их не видит в чате.
+4. Если вопрос общий (например, о документах, регистрации, участии в закупках, электронной подписи), обобщи правила и требования в виде четкого понятного списка шагов или пунктов.
+5. Если вопрос про конкретную ошибку интерфейса, назови точное действие (какую кнопку нажать, что обновить).
+6. Не выдумывай факты, которых нет в регламентах.
+7. Напиши [NO_CONTEXT] только в том случае, если предоставленный текст вообще никак не относится к вопросу пользователя."""
+
+
+def clean_text(text: str) -> str:
+    """Очищает текст от упоминаний рисунков/таблиц, markdown-звёздочек и артефактов PDF."""
+    if not text:
+        return text
+
+    # 1. Удаляем упоминания рисунков и таблиц (включая вложенные скобки типа (Рисунок 545 (3)))
+    text = re.sub(r"\s*\([сС]м\.?\s*Рисунок(?:\([^)]*\)|[^)])*\)", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*\(Рисунок(?:\([^)]*\)|[^)])*\)", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*\(Таблиц[а-яА-ЯёЁa-zA-Z0-9\s;–—\-_:]*\)", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"Рисунок\s+\d+[^–—\n]*[–—\-][^\n]*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"Таблица\s+\d+[^–—\n]*[–—\-][^\n]*", "", text, flags=re.IGNORECASE)
+
+    # 2. Удаляем markdown разметку (**жирный**, *курсив*, ### заголовки) для чистого Plain Text в чате
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_]+)__", r"\1", text)
+    text = re.sub(r"(?m)^#{1,6}\s*", "", text)
+
+    # 3. Чистим артефакты PDF: версии документов, лишние точки, повторяющиеся пробелы
+    text = re.sub(r"\b\d{2}\.\d{2}\.\d{4}v\d+\b", "", text)
+    text = re.sub(r"\.{2,}", ".", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def extract_action_for_error(query: str, chunks: List[RetrievedChunk]) -> Optional[str]:
@@ -37,7 +64,7 @@ def extract_action_for_error(query: str, chunks: List[RetrievedChunk]) -> Option
                 if code_lower in sent.lower():
                     parts = re.split(r"[–—\-]\s*", sent)
                     action = parts[-1].strip() if len(parts) > 1 else sent.strip()
-                    action = re.sub(r"\(Рисунок.*$", "", action).strip()
+                    action = clean_text(action)
                     action = re.sub(r"^(требуется|необходимо)\s+", "", action, flags=re.IGNORECASE).strip()
                     if any(
                         act in action.lower()
@@ -72,13 +99,17 @@ class AnswerGenerator:
         return headers
 
     def _build_context_prompt(self, chunks: List[RetrievedChunk]) -> str:
-        """Собирает фрагменты базы знаний в чистый контекст без триггерных метаданных."""
+        """Собирает фрагменты базы знаний в чистый контекст без артефактов и ссылок на рисунки."""
         if not chunks:
             return "Нет подходящих документов."
 
         parts = []
         for i, chunk in enumerate(chunks, 1):
-            parts.append(f"[{i}] {chunk.text.strip()}")
+            cleaned = re.sub(r"\s*\([сС]м\.?\s*Рисунок(?:\([^)]*\)|[^)])*\)", "", chunk.text, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\s*\(Рисунок(?:\([^)]*\)|[^)])*\)", "", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"Рисунок\s+\d+[^–—\n]*[–—\-][^\n]*", "", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\b\d{2}\.\d{2}\.\d{4}v\d+\b", "", cleaned)
+            parts.append(f"[{i}] {cleaned.strip()}")
 
         return "\n\n".join(parts)
 
@@ -160,12 +191,15 @@ class AnswerGenerator:
                 or "не описана" in raw_content.lower()
             )
             if is_broken and extracted_action:
-                return extracted_action
+                return clean_text(extracted_action)
 
             if not raw_content:
-                return extracted_action or "[NO_CONTEXT]"
+                return clean_text(extracted_action) if extracted_action else "[NO_CONTEXT]"
 
-            return raw_content
+            if raw_content == "[NO_CONTEXT]":
+                return "[NO_CONTEXT]"
+
+            return clean_text(raw_content)
         except Exception as e:
             if extracted_action:
                 logger.info(f"LLM недоступна, возвращаем извлеченное действие: {extracted_action}")
