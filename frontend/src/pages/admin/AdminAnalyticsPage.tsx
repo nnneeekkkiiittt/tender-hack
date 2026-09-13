@@ -62,7 +62,11 @@ export function AdminAnalyticsPage() {
 
   const activeQuery = selectedOperatorId !== null ? singleQuery : allQuery
   const data = activeQuery.data
-  const operatorOptions = (allQuery.data?.operatorAi.operators ?? []).map((o) => ({ id: o.operator_id, name: o.name }))
+  const humanOptions = (allQuery.data?.operatorAi.operators ?? []).map((o) => ({ id: o.operator_id, name: o.name }))
+  const aiRosterOption = allQuery.data?.operatorAi.aiOperator
+    ? [{ id: allQuery.data.operatorAi.aiOperator.operator_id, name: allQuery.data.operatorAi.aiOperator.name }]
+    : []
+  const operatorOptions = [...aiRosterOption, ...humanOptions]
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">

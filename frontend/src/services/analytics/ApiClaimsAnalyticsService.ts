@@ -104,7 +104,9 @@ function sortEscalations(items: EscalationResult[]): EscalationResult[] {
 
 export class ApiClaimsAnalyticsService implements ClaimsAnalyticsService {
   async getClaimsAnalytics(operatorId?: number): Promise<ClaimsAnalyticsData> {
-    if (operatorId) {
+    // operatorId can legitimately be 0 (AI) — `if (operatorId)` would treat
+    // that as falsy and silently fall through to the "all operators" branch.
+    if (operatorId !== undefined) {
       const [roster, metrics, escalations, topics] = await Promise.all([
         fetchOperatorRoster(),
         fetchOperatorMetrics(operatorId),

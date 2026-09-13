@@ -31,7 +31,19 @@ function formatPercent(value: number | null | undefined, sampleCount?: number): 
 }
 
 export function OperatorAiPanel({ data, operators, selectedOperatorId, onSelectOperator }: OperatorAiPanelProps) {
-  const { aggregate } = data
+  // When AI itself is the selected operator, the service deliberately nulls
+  // out `aggregate` (it's a per-HUMAN weighted average) and puts AI's real
+  // numbers in `aiOperator` instead — so the top KPI cards need to read from
+  // there in that one case, not from `aggregate`.
+  const isSingleAiView = selectedOperatorId !== null && data.aiOperator?.operator_id === selectedOperatorId
+  const kpi = isSingleAiView
+    ? {
+        dislikePercentage: data.aiOperator!.dislike_percentage,
+        avgResponseTimeSeconds: data.aiOperator!.avg_response_time_seconds,
+        resolvedSelfPercentage: data.aiOperator!.resolved_self_percentage,
+        topDislikeReason: data.aiOperator!.top_dislike_reason ?? null,
+      }
+    : data.aggregate
 
   return (
     <section>
@@ -55,16 +67,16 @@ export function OperatorAiPanel({ data, operators, selectedOperatorId, onSelectO
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Доля дизлайков" value={formatPercent(aggregate.dislikePercentage)} icon={ThumbsDown} tone="accent" />
-        <StatCard label="Среднее время ответа" value={formatSeconds(aggregate.avgResponseTimeSeconds)} icon={Clock} tone="primary" />
-        <StatCard label="Самостоятельно решённые" value={formatPercent(aggregate.resolvedSelfPercentage)} icon={CheckCircle2} tone="success" />
+        <StatCard label="Доля дизлайков" value={formatPercent(kpi.dislikePercentage)} icon={ThumbsDown} tone="accent" />
+        <StatCard label="Среднее время ответа" value={formatSeconds(kpi.avgResponseTimeSeconds)} icon={Clock} tone="primary" />
+        <StatCard label="Самостоятельно решённые" value={formatPercent(kpi.resolvedSelfPercentage)} icon={CheckCircle2} tone="success" />
 
         <div className="rounded-lg border border-border bg-white p-5 shadow-card">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-info-bg text-info">
             <MessageSquareWarning className="h-5 w-5" />
           </div>
           <p className="mt-4 text-lg font-semibold leading-snug tracking-tight text-ink">
-            {reasonLabel(aggregate.topDislikeReason)}
+            {reasonLabel(kpi.topDislikeReason)}
           </p>
           <p className="mt-1 text-sm text-ink-muted">Главная причина дизлайков</p>
         </div>
@@ -106,7 +118,7 @@ export function OperatorAiPanel({ data, operators, selectedOperatorId, onSelectO
               ))}
             </tbody>
           </table>
-          {data.aiOperator && (
+          {!isSingleAiView && data.aiOperator && (
             <p className="border-t border-border px-4 py-2 text-xs text-ink-muted">
               Показатели «Доля дизлайков» / «Среднее время ответа» / «Самостоятельно решённые» выше — только по людям; AI считается отдельно и не входит в это среднее.
             </p>
