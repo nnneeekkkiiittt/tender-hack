@@ -55,7 +55,7 @@ test('real local ML: cited answer, shared reactions, staff handoff, automatic L3
     await staff.getByRole('button', { name: 'Взять в работу', exact: true }).click()
     await staff.getByPlaceholder('Написать ответ пользователю...').fill('Проверка L1: передаём вопрос профильному специалисту.')
     await staff.getByRole('button', { name: 'Отправить', exact: true }).click()
-    await staff.getByRole('button', { name: 'Передать на 2-ю линию (L2)', exact: true }).click()
+    await staff.getByTitle('Передать диалог оператору L2', { exact: true }).click()
     await staff.getByRole('dialog').getByRole('button', { name: 'Передать на L2', exact: true }).click()
     await expect.poll(async () => (await (await page.request.get(path)).json()).handling_level).toBe(2)
     await staff.screenshot({ path: '/tmp/tender-real-ml-support.png', fullPage: true })
@@ -68,7 +68,7 @@ test('real local ML: cited answer, shared reactions, staff handoff, automatic L3
       await staff.getByRole('button', { name: 'Отправить', exact: true }).click()
       await expect(staff.getByText(`Проверка L${level}: ответ сотрудника сохранён.`, { exact: true })).toBeVisible()
       if (level === 2) {
-        await staff.getByRole('button', { name: 'Передать на 3-ю линию (L3)', exact: true }).click()
+        await staff.getByTitle('Передать диалог оператору L3', { exact: true }).click()
         await staff.getByRole('dialog').getByRole('button', { name: 'Передать на L3', exact: true }).click()
         await expect.poll(async () => (await (await page.request.get(path)).json()).handling_level).toBe(3)
       } else {

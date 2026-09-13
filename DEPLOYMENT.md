@@ -1,5 +1,8 @@
 # Public prototype — 2026-09-12
 
+> Historical report, not current deployment instructions. The directory, model,
+> services and ports below have changed. Use [current operations](OPERATIONS.md).
+
 URL: http://111.88.153.146
 
 SSH: `ssh -l dev 111.88.153.146`
