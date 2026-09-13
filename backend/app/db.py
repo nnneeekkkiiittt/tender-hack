@@ -24,7 +24,7 @@ def find_user(conn, token):
         """
         SELECT u.* FROM auth_sessions s JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = %s AND s.revoked_at IS NULL AND s.expires_at > clock_timestamp()
-          AND s.auth_version = u.auth_version
+          AND s.auth_version = u.auth_version AND (u.deleted_at IS NULL)
     """,
         (hashlib.sha256(token.encode()).hexdigest(),),
     ).fetchone()

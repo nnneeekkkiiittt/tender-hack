@@ -32,3 +32,6 @@ databaseChangeLog:
   - include:
       file: 011-deprecated-reason.sql
       relativeToChangelogFile: true
+  - include:
+      file: 012-employee-deletion.sql
+      relativeToChangelogFile: true
