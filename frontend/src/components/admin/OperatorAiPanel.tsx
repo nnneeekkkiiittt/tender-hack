@@ -70,7 +70,7 @@ export function OperatorAiPanel({ data, operators, selectedOperatorId, onSelectO
         </div>
       </div>
 
-      {data.operators.length > 0 && (
+      {(data.operators.length > 0 || data.aiOperator) && (
         <div className="mt-4 overflow-x-auto rounded-lg border border-border bg-white">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
@@ -83,6 +83,18 @@ export function OperatorAiPanel({ data, operators, selectedOperatorId, onSelectO
               </tr>
             </thead>
             <tbody>
+              {data.aiOperator && (
+                <tr className="border-b border-border bg-info-bg/40">
+                  <td className="px-4 py-3.5 font-medium text-ink">
+                    {data.aiOperator.name}
+                    <span className="ml-1.5 rounded-full bg-info/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-info">AI</span>
+                  </td>
+                  <td className="px-4 py-3.5 text-ink-muted">{formatPercent(data.aiOperator.dislike_percentage)}</td>
+                  <td className="px-4 py-3.5 text-ink-muted">{formatSeconds(data.aiOperator.avg_response_time_seconds)}</td>
+                  <td className="px-4 py-3.5 text-ink-muted">{formatPercent(data.aiOperator.resolved_self_percentage)}</td>
+                  <td className="px-4 py-3.5 text-ink-muted">{reasonLabel(data.aiOperator.top_dislike_reason ?? null)}</td>
+                </tr>
+              )}
               {data.operators.map((op) => (
                 <tr key={op.operator_id} className="border-b border-border last:border-0 hover:bg-gray-50/70">
                   <td className="px-4 py-3.5 font-medium text-ink">{op.name}</td>
@@ -94,6 +106,11 @@ export function OperatorAiPanel({ data, operators, selectedOperatorId, onSelectO
               ))}
             </tbody>
           </table>
+          {data.aiOperator && (
+            <p className="border-t border-border px-4 py-2 text-xs text-ink-muted">
+              Показатели «Доля дизлайков» / «Среднее время ответа» / «Самостоятельно решённые» выше — только по людям; AI считается отдельно и не входит в это среднее.
+            </p>
+          )}
         </div>
       )}
     </section>

@@ -411,9 +411,18 @@ export interface OperatorAggregate {
 }
 
 export interface OperatorAiAnalytics {
+  /** Human operators only — AI is deliberately excluded here and from
+   * `aggregate` (see AI_OPERATOR_ID in ApiClaimsAnalyticsService). Since AI
+   * is a real row in `users` (id 0, role supportL1, migration
+   * 009-add-ai-row.sql), it would otherwise dominate any volume-weighted
+   * average of "operator" performance — most claims start with AI. */
   operators: OperatorMetricsRow[]
-  /** Weighted by real counts derived from raw claims/reactions — never a naive mean of percentages. */
+  /** Weighted by real counts derived from raw claims/reactions — never a naive mean of percentages. Humans only. */
   aggregate: OperatorAggregate
+  /** AI's own metrics from the same /metrics/operator endpoint (operator_id
+   * 0), shown separately since the panel is "Операторы + AI". Null when the
+   * AI user isn't present in the roster. */
+  aiOperator: OperatorMetricsRow | null
 }
 
 export interface TopicAnalytics {
