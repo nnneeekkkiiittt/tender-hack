@@ -62,13 +62,15 @@ test('admin analytics, real Metabase widget, dashboard edit and deletion', async
   page.on('pageerror', e => pageErrors.push(e.message))
   expect((await page.request.get('/api/v1/analytics/users')).status()).toBe(401)
   expect((await page.request.post('/api/auth/demo/admin', { headers })).status()).toBe(200)
+  const failures: string[] = []
+  page.on('response', r => { if (r.status() >= 400 && /api\//.test(r.url())) failures.push(`${r.status()} ${r.url().split('?')[0]}`) })
   for (const path of ['/admin', '/admin/tickets', '/admin/users', '/admin/employees', '/admin/analytics/dashboards']) {
     await page.goto(path)
     await expect(page.locator('h1')).toBeVisible()
+    await page.waitForLoadState('networkidle')
     await expect(page.getByText('Не удалось загрузить данные', { exact: true })).not.toBeVisible()
+    await expect(page.getByText('Сервис аналитики недоступен', { exact: true })).not.toBeVisible()
   }
-  const failures: string[] = []
-  page.on('response', r => { if (r.status() >= 400 && /api\//.test(r.url())) failures.push(`${r.status()} ${r.url().split('?')[0]}`) })
   await page.goto('/admin/analytics/dashboards/new')
   const name = `Deployment dashboard ${Date.now()}`
   await page.getByLabel('Название', { exact: true }).nth(0).fill(name)
@@ -104,7 +106,7 @@ test('admin creates real L1/L2/L3 accounts; each can log in without the demo cho
     const name = `deploy-staff-l${level}-${stamp}`
     await page.getByRole('button', { name: 'Добавить сотрудника', exact: true }).click()
     const modal = page.getByRole('dialog')
-    await modal.getByLabel('Имя', { exact: true }).fill(name)
+    await modal.getByLabel('Имя пользователя', { exact: true }).fill(name)
     await modal.getByLabel('Начальный пароль').fill('staff-check-password-123')
     await modal.getByLabel('Уровень поддержки').selectOption(`supportL${level}`)
     await modal.getByRole('button', { name: 'Добавить', exact: true }).click()

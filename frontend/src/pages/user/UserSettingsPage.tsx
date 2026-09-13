@@ -32,6 +32,7 @@ export function UserSettingsPage() {
       )}
 
       <form onSubmit={handleSave} className="mt-6">
+        <fieldset disabled={!isDemoMode} className="contents">
         <Card>
           <CardHeader>
             <h2 className="text-sm font-semibold text-ink">Профиль</h2>
@@ -57,6 +58,7 @@ export function UserSettingsPage() {
           </Button>
           {saved && <span className="text-sm text-success">Сохранено</span>}
         </div>
+        </fieldset>
       </form>
     </div>
   )
