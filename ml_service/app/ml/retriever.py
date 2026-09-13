@@ -45,15 +45,7 @@ CANONICAL_SUGGESTION_EXPANSIONS: Dict[str, List[str]] = {
         "перечень документов и требования для регистрации поставщика на портале",
         "документы для участия в котировочной сессии и подачи ценового предложения",
     ],
-    "документ": [
-        "перечень документов и требования для регистрации поставщика на портале",
-        "документы для участия в котировочной сессии и подачи ценового предложения",
-    ],
     "как принять участие": [
-        "порядок участия в котировочной сессии и закупке по потребности",
-        "подача ценового предложения оферты поставщиком",
-    ],
-    "участие в закупк": [
         "порядок участия в котировочной сессии и закупке по потребности",
         "подача ценового предложения оферты поставщиком",
     ],
@@ -61,15 +53,7 @@ CANONICAL_SUGGESTION_EXPANSIONS: Dict[str, List[str]] = {
         "настройка квалифицированной электронной цифровой подписи ЭЦП КриптоПро CSP",
         "подписание оферты и контракта электронной подписью",
     ],
-    "электронная подпись": [
-        "настройка квалифицированной электронной цифровой подписи ЭЦП КриптоПро CSP",
-        "подписание оферты и контракта электронной подписью",
-    ],
     "где посмотреть результаты": [
-        "просмотр итогов котировочной сессии протокол подведения итогов",
-        "статус закупки и реестр заключенных контрактов",
-    ],
-    "результат": [
         "просмотр итогов котировочной сессии протокол подведения итогов",
         "статус закупки и реестр заключенных контрактов",
     ],
@@ -346,14 +330,14 @@ class KBRetriever:
             query_vectors = self.embed_queries_batch(search_queries)
 
             # 5. Выполняем поиск по каждому вектору в Qdrant
-            effective_search_threshold = max(0.30, min(self.score_threshold, 0.70) - 0.20)
+            search_threshold = max(0.35, self.score_threshold - 0.10)
             for q_idx, vector in enumerate(query_vectors):
                 if hasattr(self.client, "query_points"):
                     res = self.client.query_points(
                         collection_name=collection_name,
                         query=vector,
-                        limit=max(16, k * 2),
-                        score_threshold=effective_search_threshold,
+                        limit=max(16, k * 3),
+                        score_threshold=search_threshold,
                         with_payload=True,
                     )
                     points = res.points
@@ -361,8 +345,8 @@ class KBRetriever:
                     points = self.client.search(
                         collection_name=collection_name,
                         query_vector=vector,
-                        limit=max(16, k * 2),
-                        score_threshold=effective_search_threshold,
+                        limit=max(16, k * 3),
+                        score_threshold=search_threshold,
                     )
 
                 for rank, point in enumerate(points):
@@ -413,15 +397,14 @@ class KBRetriever:
                 reverse=True,
             )
 
-            # Этап 1: Отбор кандидатов по адаптивному порогу релевантности
-            effective_threshold = max(0.40, min(self.score_threshold, 0.60))
+            # Отбор кандидатов (берем наиболее релевантные по score_threshold)
             candidate_chunks: List[RetrievedChunk] = []
             for item in ranked_items[:max(12, k * 3)]:
-                if item.get("is_keyword_match") or item["max_score"] >= effective_threshold:
+                if item.get("is_keyword_match") or item["max_score"] >= self.score_threshold:
                     candidate_chunks.append(item["chunk"])
 
             if not candidate_chunks:
-                candidate_chunks = [item["chunk"] for item in ranked_items[:k]]
+                candidate_chunks = [item["chunk"] for item in ranked_items[:k] if item["max_score"] >= search_threshold]
 
             # Этап 2: Cross-Encoder реранкинг для отсечения шума и выбора лучших чанков
             top_k_final = min(k, 3)
