@@ -8,7 +8,8 @@ package metabase
 // environment variables (see cmd/main.go) and are never logged verbatim.
 type Config struct {
 	// Base URL of the Metabase instance, e.g. http://localhost:3000.
-	SiteURL string
+	SiteURL   string
+	PublicURL string
 	// Static API key (Metabase Settings -> Admin -> API Keys). Used for
 	// server-to-server calls that create/read questions and dashboards.
 	APIKey string
@@ -33,17 +34,17 @@ func (c Config) Enabled() bool {
 // CardRequest is the payload for POST /api/card (creating a native SQL
 // question). Only the fields we actually set are declared.
 type CardRequest struct {
-	Name                string           `json:"name"`
-	DatasetQuery        DatasetQuery     `json:"dataset_query"`
-	Display             string           `json:"display"`
+	Name                  string         `json:"name"`
+	DatasetQuery          DatasetQuery   `json:"dataset_query"`
+	Display               string         `json:"display"`
 	VisualizationSettings map[string]any `json:"visualization_settings"`
-	CollectionID        *int             `json:"collection_id,omitempty"`
+	CollectionID          *int           `json:"collection_id,omitempty"`
 }
 
 type DatasetQuery struct {
-	Type     string       `json:"type"`
-	Native   NativeQuery  `json:"native"`
-	Database int          `json:"database"`
+	Type     string      `json:"type"`
+	Native   NativeQuery `json:"native"`
+	Database int         `json:"database"`
 }
 
 type NativeQuery struct {
@@ -70,9 +71,9 @@ type DashboardResponse struct {
 // /api/dashboard/:id with a full cards array in newer versions — see
 // client.go for which one is actually used and why).
 type AddCardRequest struct {
-	CardID  int `json:"cardId"`
-	Row     int `json:"row"`
-	Col     int `json:"col"`
-	SizeX   int `json:"size_x"`
-	SizeY   int `json:"size_y"`
+	CardID int `json:"cardId"`
+	Row    int `json:"row"`
+	Col    int `json:"col"`
+	SizeX  int `json:"size_x"`
+	SizeY  int `json:"size_y"`
 }

@@ -4,8 +4,8 @@ import { ANALYTICS_API_URL } from '@/config/env'
 // Deliberately NOT the same client as api/contracts.ts `api()`: that one
 // expects the main backend's JSON error envelope (`{ detail }`) and
 // dispatches a `session-expired` event on 401 — neither applies here. The
-// analytics service has no session/auth concept and returns plain-text
-// error bodies (net/http.Error), so we parse errors accordingly.
+// analytics service sits behind the operational API's admin-session gateway
+// and may return plain-text error bodies (net/http.Error).
 
 export class AnalyticsApiError extends Error {
   constructor(
@@ -21,7 +21,12 @@ async function request<T>(
   options: { method?: string; params?: Record<string, unknown>; body?: unknown } = {},
 ): Promise<T> {
   const { method = 'GET', params, body } = options
-  const url = new URL(ANALYTICS_API_URL.replace(/\/$/, '') + path)
+  const base = ANALYTICS_API_URL
+    ? ANALYTICS_API_URL.replace(/\/$/, '')
+    : typeof window !== 'undefined'
+      ? window.location.origin
+      : 'http://localhost:8080'
+  const url = new URL(base + path)
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -34,7 +39,8 @@ async function request<T>(
   try {
     response = await fetch(url.toString(), {
       method,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'tender' },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
@@ -49,7 +55,10 @@ async function request<T>(
   }
 
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+
+  const text = await response.text()
+  if (text.trim() === '') return undefined as T
+  return JSON.parse(text) as T
 }
 
 export const analyticsApi = {

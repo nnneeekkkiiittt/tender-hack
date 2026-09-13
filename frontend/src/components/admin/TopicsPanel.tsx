@@ -33,7 +33,6 @@ export function TopicsPanel({ data }: TopicsPanelProps) {
               <tr key={`${row.topic}::${row.subtopic}`} className="border-b border-border last:border-0 hover:bg-gray-50/70">
                 <td className="px-4 py-3.5">
                   <span className="font-medium text-ink">{row.subtopic}</span>
-                  <span className="ml-1.5 text-xs text-ink-muted">({row.topic})</span>
                 </td>
                 <td className="px-4 py-3.5 text-ink-muted">{row.subtopic_share_percentage.toFixed(1)}%</td>
                 <td className="px-4 py-3.5 text-ink-muted">{formatHours(row.avg_resolution_time_hours)}</td>

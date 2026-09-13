@@ -27,5 +27,11 @@ databaseChangeLog:
       file: 009-add-ai-row.sql
       relativeToChangelogFile: true
   - include:
-      file: 010-extend-reason.sql
+      file: 010-dashboard-templates.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 011-deprecated-reason.sql
+      relativeToChangelogFile: true
+  - include:
+      file: 012-employee-deletion.sql
       relativeToChangelogFile: true

@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool, PoolTimeout
 from pydantic import ValidationError
 
-from . import auth, demo, demo_seed, tickets
+from . import analytics, auth, demo, demo_seed, tickets
 from .ai import AiService, HttpAiService, MockAiService
 from .config import Settings
 from .db import DB
@@ -48,7 +48,9 @@ def create_app(settings=None, ai_service: AiService | None = None,
                     raise RuntimeError(
                         "Invalid bootstrap username or password; password must contain at least 10 characters"
                     ) from None
-                with pool.connection() as conn:
+            with pool.connection() as conn:
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ")
+                if settings.bootstrap_name:
                     conn.execute("SELECT pg_advisory_xact_lock(7301951)")
                     if not conn.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1").fetchone():
                         conn.execute(
@@ -164,6 +166,7 @@ def create_app(settings=None, ai_service: AiService | None = None,
 
     app.include_router(demo.router, prefix="/api", tags=["local demo"])
     app.include_router(auth.router, prefix="/api", tags=["accounts"])
+    app.include_router(analytics.router, prefix="/api", tags=["analytics"])
     app.include_router(tickets.router, prefix="/api", tags=["claims"])
     return app
 

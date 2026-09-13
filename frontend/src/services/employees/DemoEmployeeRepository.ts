@@ -61,4 +61,10 @@ export class DemoEmployeeRepository implements EmployeeRepository {
     saveAll(employees)
     return employees[idx]
   }
+
+  async delete(id: string): Promise<void> {
+    await wait(250)
+    const employees = loadAll()
+    saveAll(employees.filter((e) => e.id !== id))
+  }
 }

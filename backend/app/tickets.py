@@ -255,7 +255,7 @@ def assign(ticket_id: Identifier, body: Assignment, user: CurrentUser, conn: DB)
             raise HTTPException(403, "Support can only take claims for themselves")
         if row["operator_id"] is not None and row["operator_id"] != user["id"]:
             raise HTTPException(409, "Another operator already owns this claim")
-    target = conn.execute("SELECT role FROM users WHERE id = %s FOR SHARE", (body.operator_id,)).fetchone()
+    target = conn.execute("SELECT role FROM users WHERE id = %s AND (deleted_at IS NULL) FOR SHARE", (body.operator_id,)).fetchone()
     if not target or target["role"] not in SUPPORT_ROLES:
         raise HTTPException(422, "Choose a support account")
     if target["role"] != f"supportL{row['handling_level']}":

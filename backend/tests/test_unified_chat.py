@@ -46,7 +46,7 @@ def test_initial_answer_idempotency_and_persistent_history(env):
     assert first.json()["id"] == retry.json()["id"]
     path = f"/api/tickets/{first.json()['id']}"
     assert first.json()["handling_level"] == 0
-    assert first.json()["operator_id"] is None
+    assert first.json()["operator_id"] == '0'
     initial = history(owner, path)
     assert [m["author_kind"] for m in initial] == ["USER", "AI"]
     assert initial[1]["sources"] == ["Manual, section 4"]

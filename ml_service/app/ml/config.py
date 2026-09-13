@@ -18,7 +18,7 @@ class MLSettings:
     # vLLM / OpenAI-совместимый LLM сервер (Qwen 2.5 7B Instruct)
     VLLM_BASE_URL: str = field(default_factory=lambda: os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1"))
     VLLM_API_KEY: str = field(default_factory=lambda: os.getenv("VLLM_API_KEY", "EMPTY"))
-    MODEL_NAME: str = field(default_factory=lambda: os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct-AWQ"))
+    MODEL_NAME: str = field(default_factory=lambda: os.getenv("MODEL_NAME", "qwen2.5-7b-instruct"))
 
     # TEI / Сервер эмбеддингов (bge-m3)
     TEI_BASE_URL: str = field(default_factory=lambda: os.getenv("TEI_BASE_URL", "http://localhost:8080"))
@@ -28,8 +28,8 @@ class MLSettings:
     QDRANT_API_KEY: str = field(default_factory=lambda: os.getenv("QDRANT_API_KEY", ""))
 
     # Имена коллекций в Qdrant
-    COLLECTION_L1: str = field(default_factory=lambda: os.getenv("COLLECTION_L1", "manuals_e5_v1"))
-    COLLECTION_L2: str = field(default_factory=lambda: os.getenv("COLLECTION_L2", "manuals_e5_v1"))
+    COLLECTION_L1: str = field(default_factory=lambda: os.getenv("COLLECTION_L1", "kb_support"))
+    COLLECTION_L2: str = field(default_factory=lambda: os.getenv("COLLECTION_L2", "kb_support"))
 
     # Параметры поиска и пороги отсечения
     TOP_K: int = field(default_factory=lambda: int(os.getenv("TOP_K", "4")))
@@ -40,7 +40,7 @@ class MLSettings:
     GENERATOR_TEMPERATURE: float = 0.1
     MAX_TOKENS_GENERATOR: int = 512
     REQUEST_TIMEOUT: float = field(default_factory=lambda: float(os.getenv("REQUEST_TIMEOUT", "120")))
-    EMBEDDING_PREFIX: str = field(default_factory=lambda: os.getenv("EMBEDDING_PREFIX", "query: "))
+    EMBEDDING_PREFIX: str = field(default_factory=lambda: os.getenv("EMBEDDING_PREFIX", ""))
 
 
 settings = MLSettings()

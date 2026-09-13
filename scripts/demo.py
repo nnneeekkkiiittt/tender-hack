@@ -92,13 +92,13 @@ def configuration(args, state):
             'BOOTSTRAP_ADMIN_PASSWORD': secrets.token_urlsafe(24),
             'AI_API_KEY': secrets.token_hex(24),
             'DEMO_ACCOUNTS': 'true', 'DEMO_SEED': 'true', 'COOKIE_SECURE': 'false',
-            'AI_TIMEOUT': '420', 'MODEL_NAME': 'local-qwen',
+            'AI_TIMEOUT': '420', 'MODEL_NAME': 'qwen2.5-7b-instruct',
             'VLLM_BASE_URL': 'http://llm:8002/v1',
             'WEB_PORT': str(args.port), 'API_PORT': str(args.api_port), 'DB_PORT': str(args.db_port),
             'ALLOWED_ORIGINS': f'http://localhost:{args.port},http://127.0.0.1:{args.port}',
             'MANUALS_PATH': str(state / 'knowledge'),
             'E5_MODEL_PATH': str(state / 'models/e5'),
-            'QWEN_MODEL_PATH': str(state / 'models/qwen/Qwen3-4B-Q4_K_M.gguf'),
+            'QWEN_MODEL_PATH': str(state / 'models/qwen/Qwen2.5-7B-Instruct-Q4_K_M.gguf'),
         }
         fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as stream:

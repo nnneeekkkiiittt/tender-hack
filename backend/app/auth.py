@@ -69,7 +69,7 @@ def register(body: Credentials, response: Response, request: Request, conn: DB):
 @router.post("/auth/login", response_model=User)
 def login(body: Login, response: Response, request: Request, conn: DB):
     user = conn.execute(
-        "SELECT * FROM users WHERE lower(name) = lower(%s) FOR UPDATE", (body.name,)
+        "SELECT * FROM users WHERE lower(name) = lower(%s) AND (deleted_at IS NULL) FOR UPDATE", (body.name,)
     ).fetchone()
     valid = verify(body.password, user["hash"] if user else DUMMY_HASH)
     if not user or not valid:
@@ -106,7 +106,7 @@ def change_password(body: PasswordChange, response: Response, user: CurrentUser,
 def directory(conn, employee, search, offset, limit):
     role_clause = "role IN ('supportL1', 'supportL2', 'supportL3')" if employee else "role = 'user'"
     pattern = "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-    where = role_clause + " AND name ILIKE %s"
+    where = role_clause + " AND name ILIKE %s AND (deleted_at IS NULL)"
     total = conn.execute(f"SELECT count(*) AS total FROM users WHERE {where}", (pattern,)).fetchone()["total"]
     rows = conn.execute(
         f"SELECT id, name, role FROM users WHERE {where} ORDER BY id LIMIT %s OFFSET %s",
@@ -152,7 +152,9 @@ def create_employee(body: EmployeeCreate, user: CurrentUser, conn: DB):
 @router.patch("/employees/{employee_id}", response_model=User)
 def update_employee(employee_id: Identifier, body: EmployeeUpdate, user: CurrentUser, conn: DB):
     require_admin(user)
-    target = conn.execute("SELECT role FROM users WHERE id = %s FOR UPDATE", (employee_id,)).fetchone()
+    target = conn.execute(
+        "SELECT role FROM users WHERE id = %s AND (deleted_at IS NULL) FOR UPDATE", (employee_id,)
+    ).fetchone()
     if not target or target["role"] not in SUPPORT_ROLES:
         raise HTTPException(404, "Support account not found")
     if (
@@ -166,6 +168,58 @@ def update_employee(employee_id: Identifier, body: EmployeeUpdate, user: Current
         "UPDATE users SET name = %s, role = %s WHERE id = %s RETURNING *", (body.name, body.role, employee_id)
     ).fetchone()
     return public_user(row)
+
+
+@router.delete("/employees/{employee_id}", status_code=204)
+def delete_employee(employee_id: Identifier, user: CurrentUser, conn: DB):
+    require_admin(user)
+    conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ")
+    target = conn.execute(
+        "SELECT id, name, role FROM users WHERE id = %s AND (deleted_at IS NULL) FOR UPDATE", (employee_id,)
+    ).fetchone()
+    if not target or target["role"] not in SUPPORT_ROLES:
+        raise HTTPException(404, "Support account not found")
+    if conn.execute(
+        "SELECT 1 FROM claims WHERE operator_id = %s AND status = 'IN WORK' LIMIT 1", (employee_id,)
+    ).fetchone():
+        raise HTTPException(409, "Переназначьте активные обращения перед удалением сотрудника")
+
+    conn.execute("DELETE FROM demo_accounts WHERE user_id = %s", (employee_id,))
+    conn.execute("DELETE FROM auth_sessions WHERE user_id = %s", (employee_id,))
+
+    has_history = conn.execute(
+        """
+        SELECT 1 FROM claims WHERE operator_id = %s OR author_id = %s
+        UNION ALL
+        SELECT 1 FROM messages WHERE author = %s
+        UNION ALL
+        SELECT 1 FROM reactions WHERE "operator" = %s OR submitted_by = %s
+        UNION ALL
+        SELECT 1 FROM claim_events WHERE actor_id = %s
+        UNION ALL
+        SELECT 1 FROM faq_feedback WHERE submitted_by = %s
+        LIMIT 1
+        """,
+        (employee_id, employee_id, employee_id, employee_id, employee_id, employee_id, employee_id),
+    ).fetchone()
+
+    if not has_history:
+        try:
+            with conn.transaction():
+                conn.execute("DELETE FROM users WHERE id = %s", (employee_id,))
+                return
+        except Exception:
+            pass
+
+    conn.execute(
+        """
+        UPDATE users
+        SET deleted_at = clock_timestamp(),
+            name = substring(name from 1 for 200) || '_deleted_' || id
+        WHERE id = %s
+        """,
+        (employee_id,),
+    )
 
 
 @router.post("/users/{user_id}/password", status_code=204)

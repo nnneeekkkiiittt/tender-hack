@@ -21,9 +21,9 @@ import (
 func main() {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		getEnv("DB_USER", "postgres"),
-		getEnv("DB_PASSWORD", " 9d5b09bfe734ca09d6fffdc2dc940c258e112588881bfacd"),
-		getEnv("DB_HOST", "111.88.153.146"),
-		getEnv("DB_PORT", "5433"),
+		getEnv("DB_PASSWORD", "postgres"),
+		getEnv("DB_HOST", "postgres"),
+		getEnv("DB_PORT", "5432"),
 		getEnv("DB_NAME", "tender-hack"),
 	)
 	mux := http.NewServeMux()
@@ -46,6 +46,7 @@ func main() {
 
 	mbConfig := metabase.Config{
 		SiteURL:         getEnv("METABASE_URL", ""),
+		PublicURL:       getEnv("METABASE_PUBLIC_URL", ""),
 		APIKey:          getEnv("METABASE_API_KEY", ""),
 		EmbeddingSecret: getEnv("METABASE_EMBEDDING_SECRET", ""),
 		DatabaseID:      getEnvInt("METABASE_DATABASE_ID", 0),

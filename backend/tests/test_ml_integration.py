@@ -129,3 +129,4 @@ def test_ml_migration_does_not_rewrite_existing_data(env, database_url):
             for table in ("claims", "messages", "claim_events", "reactions")
         ]
         assert after == before
+        conn.rollback()  # Do not leave the older trigger installed for later tests.

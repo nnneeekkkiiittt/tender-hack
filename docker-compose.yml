@@ -21,7 +21,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
       POSTGRES_DB: ${DB_NAME:-tender-hack}
     ports:
-      - '5433:5433'
+      - '5433:5432'
     volumes:
       - tenderhack_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -46,6 +46,11 @@ services:
     command: update
 
   backend:
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      moderation:
+        condition: service_healthy
     build: ./backend
     restart: unless-stopped
     environment:
@@ -63,11 +68,6 @@ services:
       MODERATION_URL: http://moderation:8003/check
       MODERATION_API_KEY: ${MODERATION_API_KEY:-${AI_API_KEY:-}}
       MODERATION_TIMEOUT: ${MODERATION_TIMEOUT:-2}
-    depends_on:
-      moderation:
-        condition: service_healthy
-      liquibase:
-        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     healthcheck:
@@ -105,11 +105,7 @@ services:
     restart: unless-stopped
     volumes:
       - tei_data:/data
-      - ${E5_MODEL_PATH:-./.demo/models/e5}:/model:ro
-    environment:
-      HF_HUB_OFFLINE: "1"
-      OMP_NUM_THREADS: "4"
-    command: ["--model-id", "/model", "--port", "80", "--max-client-batch-size", "32"]
+    command: ["--model-id", "BAAI/bge-m3", "--port", "80"]
 
   llm:
     profiles: [ml]
@@ -122,10 +118,12 @@ services:
       retries: 6
       start_period: 30s
     volumes:
-      - ${QWEN_MODEL_PATH:-./.demo/models/qwen/Qwen3-4B-Q4_K_M.gguf}:/models/qwen.gguf:ro
+      - ${QWEN_MODEL_PATH:-./.demo/models/qwen/Qwen2.5-7B-Instruct-Q4_K_M.gguf}:/models/qwen.gguf:ro
     command:
       - --model
       - /models/qwen.gguf
+      - --alias
+      - qwen2.5-7b-instruct
       - --alias
       - local-qwen
       - --host
@@ -155,12 +153,12 @@ services:
       TEI_BASE_URL: http://tei:80
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://llm:8002/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-EMPTY}
-      MODEL_NAME: ${MODEL_NAME:-local-qwen}
+      MODEL_NAME: ${MODEL_NAME:-qwen2.5-7b-instruct}
       ML_API_KEY: ${AI_API_KEY:-}
-      EMBEDDING_PREFIX: "query: "
-      COLLECTION_L1: manuals_e5_v1
-      COLLECTION_L2: manuals_e5_v1
-      SCORE_THRESHOLD: "0.70"
+      EMBEDDING_PREFIX: ""
+      COLLECTION_L1: kb_support
+      COLLECTION_L2: kb_support
+      SCORE_THRESHOLD: "0.50"
       REQUEST_TIMEOUT: "240"
       KB_PATH: /knowledge/dense_kb_v1
     volumes:
@@ -191,26 +189,42 @@ services:
       DB_HOST: postgres
       DB_PORT: '5432'
       DB_NAME: ${DB_NAME:-tender-hack}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
       # Metabase integration — all optional; dashboards still save without
       # them, widgets just won't render until these are set (see
       # analytics/README.md for how to obtain each value).
       METABASE_URL: ${METABASE_URL:-}
+      METABASE_PUBLIC_URL: ${METABASE_PUBLIC_URL:-}
       METABASE_API_KEY: ${METABASE_API_KEY:-}
       METABASE_EMBEDDING_SECRET: ${METABASE_EMBEDDING_SECRET:-}
       METABASE_DATABASE_ID: ${METABASE_DATABASE_ID:-}
     ports:
-      - '8080:8080'
+      - '127.0.0.1:8080:8080'
 
   # Metabase is a fully separate service — the frontend never starts it and
   # never talks to Postgres directly; it only calls the analytics backend
   # and Metabase's embed endpoints.
+  metabase-db:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${DB_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
+      PGDATABASE: postgres
+      METABASE_APP_DB_NAME: ${METABASE_APP_DB_NAME:-metabase_app}
+    volumes:
+      - ./scripts/init-metabase-db.sh:/init.sh:ro
+    entrypoint: [sh, /init.sh]
+
   metabase:
     image: metabase/metabase:v0.56.8
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      metabase-db:
+        condition: service_completed_successfully
     environment:
       MB_DB_TYPE: postgres
       MB_DB_HOST: postgres
@@ -233,7 +247,7 @@ services:
       args:
         VITE_APP_MODE: ${VITE_APP_MODE:-api}
         VITE_API_URL: ${VITE_API_URL:-/api}
-        VITE_ANALYTICS_API_URL: ${VITE_ANALYTICS_API_URL:-http://localhost:8080}
+        VITE_ANALYTICS_API_URL: ${VITE_ANALYTICS_API_URL:-}
         VITE_METABASE_URL: ${VITE_METABASE_URL:-http://localhost:3000}
     restart: unless-stopped
     depends_on:
@@ -247,4 +261,3 @@ volumes:
   tenderhack_postgres_data:
   qdrant_data:
   tei_data:
-

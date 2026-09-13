@@ -135,6 +135,9 @@ def test_full_workflow_permissions_and_feedback(actors, database_url):
         ).fetchall()
         assert events[0] == (int(owner_user["id"]), "NEW")
         assert events[-1] == (int(staff2["id"]), "DONE")
+    del_staff2 = admin.delete(f"/api/employees/{staff2['id']}")
+    assert del_staff2.status_code == 204
+    assert admin.get("/api/employees", params={"search": staff2["name"]}).json()["total"] == 0
 
 
 def test_cancellation_lists_and_pagination(actors):
@@ -229,11 +232,14 @@ def test_csrf_limits_and_employee_management(env):
     updated = admin.patch(f"/api/employees/{person['id']}", json={"name": "staff-new", "role": "supportL2"})
     assert updated.status_code == 200
     assert staff.get("/api/auth/me").json()["name"] == "staff-new"
-    assert admin.get("/api/employees", params={"search": "staff-new"}).json()["total"] == 1
     assert (
         admin.patch(f"/api/employees/{person['id']}", json={"name": "staff-new", "role": "admin"}).status_code
         == 422
     )
+    deleted = admin.delete(f"/api/employees/{person['id']}")
+    assert deleted.status_code == 204
+    assert admin.get("/api/employees", params={"search": "staff-new"}).json()["total"] == 0
+    assert staff.get("/api/auth/me").json() is None
     app.state.settings.auth_rate_limit = 1
     assert user.post("/api/auth/login", json={"name": "ordinary", "password": "bad"}).status_code == 429
 

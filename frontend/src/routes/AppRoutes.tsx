@@ -16,12 +16,13 @@ import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { UserHomePage } from '@/pages/user/UserHomePage'
 import { UserTicketsPage } from '@/pages/user/UserTicketsPage'
 import { UserTicketDetailPage } from '@/pages/user/UserTicketDetailPage'
+import { UserSettingsPage } from '@/pages/user/UserSettingsPage'
 
 import { SupportDashboardPage } from '@/pages/support/SupportDashboardPage'
 import { SupportTicketDetailPage } from '@/pages/support/SupportTicketDetailPage'
 import { SupportStatsPage } from '@/pages/support/SupportStatsPage'
+import { SupportSettingsPage } from '@/pages/support/SupportSettingsPage'
 
-import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
 import { AdminTicketsPage } from '@/pages/admin/AdminTicketsPage'
 import { AdminTicketDetailPage } from '@/pages/admin/AdminTicketDetailPage'
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
@@ -61,6 +62,7 @@ export function AppRoutes() {
           <Route path="/tickets" element={<UserTicketsPage />} />
           <Route path="/tickets/new" element={<Navigate to="/app" replace />} />
           <Route path="/tickets/:id" element={<UserTicketDetailPage />} />
+          <Route path="/app/settings" element={<UserSettingsPage />} />
         </Route>
       </Route>
 
@@ -78,18 +80,14 @@ export function AppRoutes() {
             element={isDemoMode ? <SupportStatsPage /> : <UnavailableState title="Статистика" />}
           />
           <Route path="/support/tickets/:id" element={<SupportTicketDetailPage />} />
+          <Route path="/support/settings" element={<SupportSettingsPage />} />
         </Route>
       </Route>
 
       {/* ADMIN */}
       <Route element={<ProtectedRoute allow={['ADMIN']} />}>
         <Route element={<AdminLayout />}>
-          <Route
-            path="/admin"
-            element={
-              isDemoMode ? <AdminDashboardPage /> : <UnavailableState title="Общая статистика" />
-            }
-          />
+          <Route path="/admin" element={<AdminAnalyticsPage />} />
           <Route path="/admin/tickets" element={<AdminTicketsPage />} />
           <Route path="/admin/tickets/:id" element={<AdminTicketDetailPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />

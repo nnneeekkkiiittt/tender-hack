@@ -10,7 +10,7 @@ COPY . .
 # docker-compose.yml, which passes them under build.args accordingly.
 ARG VITE_APP_MODE=api
 ARG VITE_API_URL=/api
-ARG VITE_ANALYTICS_API_URL=http://localhost:8080
+ARG VITE_ANALYTICS_API_URL=
 ARG VITE_METABASE_URL=http://localhost:3000
 ENV VITE_APP_MODE=$VITE_APP_MODE \
     VITE_API_URL=$VITE_API_URL \
