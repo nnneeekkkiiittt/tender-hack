@@ -76,6 +76,29 @@ def advance(conn, row, level=None):
     )
 
 
+def resolve_by_ai(conn, row):
+    # A "helpful" rating on the AI's first-line answer closes the claim
+    # without ever assigning a human operator. Done as two steps
+    # (NEW -> IN WORK -> DONE) rather than jumping straight to DONE: the
+    # existing prepare_claim() trigger already allows both of those
+    # transitions individually (it only blocks a direct NEW -> DONE jump),
+    # so this needs no migration/trigger change. operator_id stays 0 (AI)
+    # throughout — 0 counts as "not NULL" for claims_status_operator, so
+    # both steps satisfy that check too.
+    conn.execute(
+        "UPDATE claims SET status = 'IN WORK', operator_id = 0 WHERE id = %s",
+        (row["id"],),
+    )
+    conn.execute(
+        "UPDATE claims SET status = 'DONE', operator_id = 0 WHERE id = %s",
+        (row["id"],),
+    )
+    conn.execute(
+        "INSERT INTO messages(claim_id, author_kind, text) VALUES (%s, 'SYSTEM', %s)",
+        (row["id"], "Обращение закрыто: ответ AI решил вопрос."),
+    )
+
+
 @router.get("/tickets", response_model=Page[Ticket])
 def list_tickets(
     user: CurrentUser,
@@ -255,7 +278,7 @@ def assign(ticket_id: Identifier, body: Assignment, user: CurrentUser, conn: DB)
             raise HTTPException(403, "Support can only take claims for themselves")
         if row["operator_id"] is not None and row["operator_id"] != user["id"]:
             raise HTTPException(409, "Another operator already owns this claim")
-    target = conn.execute("SELECT role FROM users WHERE id = %s AND (deleted_at IS NULL) FOR SHARE", (body.operator_id,)).fetchone()
+    target = conn.execute("SELECT role FROM users WHERE id = %s FOR SHARE", (body.operator_id,)).fetchone()
     if not target or target["role"] not in SUPPORT_ROLES:
         raise HTTPException(422, "Choose a support account")
     if target["role"] != f"supportL{row['handling_level']}":
@@ -296,6 +319,8 @@ def react_to_ai(
     reaction = save_reaction(conn, row, user, body, message_id)
     if not body.like and row["handling_level"] == 0:
         advance(conn, row)
+    elif body.like and row["handling_level"] == 0 and row["status"] == "NEW":
+        resolve_by_ai(conn, row)
     return reaction
 
 

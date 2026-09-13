@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, CheckCircle2 } from 'lucide-react'
 import { reasons, type ReactionInput } from '@/api/contracts'
 import { Button } from '@/components/ui/Button'
 export function ReactionForm({
@@ -16,6 +16,19 @@ export function ReactionForm({
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false)
   const radioName = useId()
+
+  // A saved "like" closes the loop — nothing left to rate, so show a plain
+  // confirmation instead of leaving the rating controls (and the submit
+  // button) sitting there with nothing to do.
+  if (initial?.like) {
+    return (
+      <p className="mt-3 flex items-center gap-1.5 text-sm text-success">
+        <CheckCircle2 className="h-4 w-4" />
+        Спасибо! Рады, что смогли помочь.
+      </p>
+    )
+  }
+
   return (
     <form
       className="mt-3 space-y-3 text-sm"
