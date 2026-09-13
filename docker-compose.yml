@@ -96,15 +96,11 @@ services:
 
   tei:
     profiles: [ml]
-    image: ghcr.io/huggingface/text-embeddings-inference@sha256:e0918e6fc9020c7fcef8733f4191f6bffe2f5be44c1e409658be3244dfaf1231
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
     restart: unless-stopped
     volumes:
       - tei_data:/data
-      - ${E5_MODEL_PATH:-./.demo/models/e5}:/model:ro
-    environment:
-      HF_HUB_OFFLINE: "1"
-      OMP_NUM_THREADS: "4"
-    command: ["--model-id", "/model", "--port", "80", "--max-client-batch-size", "32"]
+    command: ["--model-id", "BAAI/bge-m3", "--port", "80"]
 
   llm:
     profiles: [ml]
@@ -117,10 +113,12 @@ services:
       retries: 6
       start_period: 30s
     volumes:
-      - ${QWEN_MODEL_PATH:-./.demo/models/qwen/Qwen3-4B-Q4_K_M.gguf}:/models/qwen.gguf:ro
+      - ${QWEN_MODEL_PATH:-./.demo/models/qwen/Qwen2.5-7B-Instruct-Q4_K_M.gguf}:/models/qwen.gguf:ro
     command:
       - --model
       - /models/qwen.gguf
+      - --alias
+      - qwen2.5-7b-instruct
       - --alias
       - local-qwen
       - --host
@@ -150,11 +148,11 @@ services:
       TEI_BASE_URL: http://tei:80
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://llm:8002/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-EMPTY}
-      MODEL_NAME: ${MODEL_NAME:-local-qwen}
+      MODEL_NAME: ${MODEL_NAME:-qwen2.5-7b-instruct}
       ML_API_KEY: ${AI_API_KEY:-}
-      EMBEDDING_PREFIX: "query: "
-      COLLECTION_L1: manuals_e5_v1
-      COLLECTION_L2: manuals_e5_v1
+      EMBEDDING_PREFIX: ""
+      COLLECTION_L1: kb_support
+      COLLECTION_L2: kb_support
       SCORE_THRESHOLD: "0.50"
       REQUEST_TIMEOUT: "240"
       KB_PATH: /knowledge/dense_kb_v1

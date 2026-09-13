@@ -7,10 +7,10 @@
   },
   "models": [
     {
-      "path": "qwen/Qwen3-4B-Q4_K_M.gguf",
-      "url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf",
-      "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
-      "size": 2497280256
+      "path": "qwen/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+      "sha256": "8a45e4e923f03f4106bcc375cb83fc383c2c570529acb2085c6468df10b50ad5",
+      "size": 4683074240
     },
     {
       "path": "e5/1_Pooling/config.json",
