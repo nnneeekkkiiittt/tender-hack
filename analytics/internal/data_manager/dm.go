@@ -228,56 +228,48 @@ func (m *DataManager) GetOperatorMetrics(
 		OperatorID: operatorID,
 	}
 
-	// AI
-	if operatorID == 0 {
-		const aiResolvedQuery = `
+	// AI (operator_id = 0, see migrations/009-add-ai-row.sql) has no
+	// reactions with target_kind = 'OPERATOR' — the reactions_target CHECK
+	// constraint in 006-unified-reactions.sql requires AI reactions to be
+	// target_kind = 'AI_MESSAGE' with operator_id ALWAYS NULL (there is only
+	// one AI, so there's nothing to filter by id). Queries 1 and 4 below
+	// therefore need a different WHERE clause for AI; queries 2 and 3 are
+	// based on claims.operator_id, which IS correctly 0 for AI-owned claims,
+	// so they work unmodified for both cases.
+	isAI := operatorID == 0
+
+	// 1. Доля дизлайков.
+	var dislikeQuery string
+	dislikeArgs := []any{}
+	if isAI {
+		dislikeQuery = `
             SELECT COALESCE(
-                COUNT(*) FILTER (
-                    WHERE target_kind = 'AI_MESSAGE'
-                      AND "like" = true
-                )::float
-                /
-                NULLIF(
-                    COUNT(*) FILTER (
-                        WHERE target_kind = 'AI_MESSAGE'
-                    ),
-                    0
-                ) * 100,
+                COUNT(*) FILTER (WHERE "like" = false)::float
+                / NULLIF(COUNT(*), 0) * 100,
                 0
             )
             FROM reactions
+            WHERE target_kind = 'AI_MESSAGE'
         `
-
-		if err := m.db.QueryRow(
-			ctx,
-			aiResolvedQuery,
-		).Scan(&res.ResolvedSelfPercentage); err != nil {
-			return nil, fmt.Errorf("error AI resolved query: %w", err)
-		}
-
-		return res, nil
+	} else {
+		dislikeQuery = `
+            SELECT COALESCE(
+                COUNT(*) FILTER (WHERE "like" = false)::float
+                / NULLIF(COUNT(*), 0) * 100,
+                0
+            )
+            FROM reactions
+            WHERE target_kind = 'OPERATOR'
+              AND operator_id = $1
+        `
+		dislikeArgs = append(dislikeArgs, operatorID)
 	}
-
-	// 1. Доля дизлайков по реакциям на оператора.
-	const dislikeQuery = `
-        SELECT COALESCE(
-            COUNT(*) FILTER (WHERE "like" = false)::float
-            / NULLIF(COUNT(*), 0) * 100,
-            0
-        )
-        FROM reactions
-        WHERE target_kind = 'OPERATOR'
-          AND operator_id = $1
-    `
-	if err := m.db.QueryRow(
-		ctx,
-		dislikeQuery,
-		operatorID,
-	).Scan(&res.DislikePercentage); err != nil {
+	if err := m.db.QueryRow(ctx, dislikeQuery, dislikeArgs...).Scan(&res.DislikePercentage); err != nil {
 		return nil, fmt.Errorf("error dislike query: %w", err)
 	}
 
-	// 2. Средний интервал между сообщениями оператора.
+	// 2. Средний интервал между сообщениями по заявкам, закреплённым за этим
+	// operator_id — для ИИ это тоже корректно работает при operator_id = 0.
 	const avgRespQuery = `
         WITH intervals AS (
             SELECT EXTRACT(
@@ -308,7 +300,8 @@ func (m *DataManager) GetOperatorMetrics(
 		return nil, fmt.Errorf("error avg response time query: %w", err)
 	}
 
-	// 3. Процент самостоятельно решённых обращений оператором.
+	// 3. Процент самостоятельно решённых обращений — claims ещё закреплены
+	// за этим operator_id (для ИИ тоже корректно при operator_id = 0).
 	const selfResolvedQuery = `
         SELECT COALESCE(
             COUNT(*) FILTER (
@@ -330,25 +323,37 @@ func (m *DataManager) GetOperatorMetrics(
 		return nil, fmt.Errorf("error self resolved query: %w", err)
 	}
 
-	// 4. Самая частая причина дизлайка.
-	const topReasonQuery = `
-        SELECT x.reason
-        FROM reactions r
-        CROSS JOIN LATERAL unnest(r.reasons) AS x(reason)
-        WHERE r.target_kind = 'OPERATOR'
-          AND r.operator_id = $1
-          AND r."like" = false
-        GROUP BY x.reason
-        ORDER BY COUNT(*) DESC
-        LIMIT 1
-    `
+	// 4. Самая частая причина дизлайка — тот же нюанс с target_kind, что и в п.1.
+	var topReasonQuery string
+	topReasonArgs := []any{}
+	if isAI {
+		topReasonQuery = `
+            SELECT x.reason
+            FROM reactions r
+            CROSS JOIN LATERAL unnest(r.reasons) AS x(reason)
+            WHERE r.target_kind = 'AI_MESSAGE'
+              AND r."like" = false
+            GROUP BY x.reason
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        `
+	} else {
+		topReasonQuery = `
+            SELECT x.reason
+            FROM reactions r
+            CROSS JOIN LATERAL unnest(r.reasons) AS x(reason)
+            WHERE r.target_kind = 'OPERATOR'
+              AND r.operator_id = $1
+              AND r."like" = false
+            GROUP BY x.reason
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        `
+		topReasonArgs = append(topReasonArgs, operatorID)
+	}
 
 	var topReason string
-	if err := m.db.QueryRow(
-		ctx,
-		topReasonQuery,
-		operatorID,
-	).Scan(&topReason); err == nil {
+	if err := m.db.QueryRow(ctx, topReasonQuery, topReasonArgs...).Scan(&topReason); err == nil {
 		res.TopDislikeReason = topReason
 	} else if err != pgx.ErrNoRows {
 		return nil, fmt.Errorf("error top dislike reason query: %w", err)
