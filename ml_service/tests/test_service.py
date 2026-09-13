@@ -284,6 +284,17 @@ def test_router_routes_rdik_error_to_l2():
     assert decision.line == SupportLine.L2
 
 
+def test_router_preserves_infrastructure_l3_without_broken_json_mode():
+    from app.ml.router import IntentRouter
+    router = IntentRouter()
+    router.session = Mock()
+    router.session.post.return_value.json.return_value = {
+        'choices': [{'message': {'content': '{"line":"L3","topic":"Технический инцидент","subtopic":""}'}}]
+    }
+    assert router.route('Портал возвращает ошибку 500 при входе.').line == 'L3'
+    assert 'response_format' not in router.session.post.call_args.kwargs['json']
+
+
 def test_generator_returns_exact_action_for_rdik_without_llm():
     from app.ml.generator import AnswerGenerator
 
@@ -303,4 +314,3 @@ def test_retriever_expand_query_preserves_error_code():
     queries = retriever.expand_query("ошибка РДИК_0217")
     assert "ошибка РДИК_0217" in queries
     assert any("0217" in q for q in queries)
-

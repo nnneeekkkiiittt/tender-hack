@@ -280,7 +280,9 @@ class IntentRouter:
             "messages": messages,
             "temperature": settings.ROUTER_TEMPERATURE,
             "max_tokens": 150,
-            "response_format": {"type": "json_object"},
+            # Qwen on the deployed vLLM emits malformed whitespace loops in
+            # json_object mode. The prompt requests JSON; parsing below still
+            # validates it and retains the explicit failure fallback.
         }
 
         try:
@@ -307,9 +309,10 @@ class IntentRouter:
 
             # Защита от ложной классификации: ошибки РДИК, оферт, ЭЦП, валидации — всегда L2
             q_lower = query.lower()
+            infrastructure_error = bool(re.search(r'(?<![\w])(?:500|502|503|504)(?!\d)', q_lower))
             if (
                 "рдик" in q_lower
-                or ("ошибк" in q_lower and any(c.isdigit() for c in q_lower))
+                or ("ошибк" in q_lower and any(c.isdigit() for c in q_lower) and not infrastructure_error)
                 or (line_enum == SupportLine.L3 and (
                     "оферт" in q_lower
                     or "сте" in q_lower
