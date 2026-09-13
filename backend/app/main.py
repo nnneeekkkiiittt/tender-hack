@@ -48,7 +48,9 @@ def create_app(settings=None, ai_service: AiService | None = None,
                     raise RuntimeError(
                         "Invalid bootstrap username or password; password must contain at least 10 characters"
                     ) from None
-                with pool.connection() as conn:
+            with pool.connection() as conn:
+                conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ")
+                if settings.bootstrap_name:
                     conn.execute("SELECT pg_advisory_xact_lock(7301951)")
                     if not conn.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1").fetchone():
                         conn.execute(

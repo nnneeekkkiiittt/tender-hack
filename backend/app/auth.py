@@ -173,43 +173,53 @@ def update_employee(employee_id: Identifier, body: EmployeeUpdate, user: Current
 @router.delete("/employees/{employee_id}", status_code=204)
 def delete_employee(employee_id: Identifier, user: CurrentUser, conn: DB):
     require_admin(user)
+    conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ")
     target = conn.execute(
-        "SELECT id, role FROM users WHERE id = %s AND (deleted_at IS NULL) FOR UPDATE", (employee_id,)
+        "SELECT id, name, role FROM users WHERE id = %s AND (deleted_at IS NULL) FOR UPDATE", (employee_id,)
     ).fetchone()
     if not target or target["role"] not in SUPPORT_ROLES:
         raise HTTPException(404, "Support account not found")
     if conn.execute(
         "SELECT 1 FROM claims WHERE operator_id = %s AND status = 'IN WORK' LIMIT 1", (employee_id,)
     ).fetchone():
-        raise HTTPException(409, "Reassign active claims before deleting the employee account")
-
-    has_history = conn.execute(
-        """
-        SELECT 1 FROM claims WHERE operator_id = %s
-        UNION ALL
-        SELECT 1 FROM messages WHERE author = %s
-        UNION ALL
-        SELECT 1 FROM reactions WHERE "operator" = %s OR submitted_by = %s
-        LIMIT 1
-        """,
-        (employee_id, employee_id, employee_id, employee_id),
-    ).fetchone()
+        raise HTTPException(409, "Переназначьте активные обращения перед удалением сотрудника")
 
     conn.execute("DELETE FROM demo_accounts WHERE user_id = %s", (employee_id,))
     conn.execute("DELETE FROM auth_sessions WHERE user_id = %s", (employee_id,))
 
+    has_history = conn.execute(
+        """
+        SELECT 1 FROM claims WHERE operator_id = %s OR author_id = %s
+        UNION ALL
+        SELECT 1 FROM messages WHERE author = %s
+        UNION ALL
+        SELECT 1 FROM reactions WHERE "operator" = %s OR submitted_by = %s
+        UNION ALL
+        SELECT 1 FROM claim_events WHERE actor_id = %s
+        UNION ALL
+        SELECT 1 FROM faq_feedback WHERE submitted_by = %s
+        LIMIT 1
+        """,
+        (employee_id, employee_id, employee_id, employee_id, employee_id, employee_id, employee_id),
+    ).fetchone()
+
     if not has_history:
-        conn.execute("DELETE FROM users WHERE id = %s", (employee_id,))
-    else:
-        conn.execute(
-            """
-            UPDATE users
-            SET deleted_at = clock_timestamp(),
-                name = name || '_deleted_' || id
-            WHERE id = %s
-            """,
-            (employee_id,),
-        )
+        try:
+            with conn.transaction():
+                conn.execute("DELETE FROM users WHERE id = %s", (employee_id,))
+                return
+        except Exception:
+            pass
+
+    conn.execute(
+        """
+        UPDATE users
+        SET deleted_at = clock_timestamp(),
+            name = substring(name from 1 for 200) || '_deleted_' || id
+        WHERE id = %s
+        """,
+        (employee_id,),
+    )
 
 
 @router.post("/users/{user_id}/password", status_code=204)

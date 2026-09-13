@@ -135,6 +135,9 @@ def test_full_workflow_permissions_and_feedback(actors, database_url):
         ).fetchall()
         assert events[0] == (int(owner_user["id"]), "NEW")
         assert events[-1] == (int(staff2["id"]), "DONE")
+    del_staff2 = admin.delete(f"/api/employees/{staff2['id']}")
+    assert del_staff2.status_code == 204
+    assert admin.get("/api/employees", params={"search": staff2["name"]}).json()["total"] == 0
 
 
 def test_cancellation_lists_and_pagination(actors):
