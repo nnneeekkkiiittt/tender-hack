@@ -220,39 +220,140 @@ func (m *DataManager) GetRawReactionsData(ctx context.Context, f models.Reaction
 	return result, nil
 }
 
-func (m *DataManager) GetOperatorMetrics(ctx context.Context, operatorID int64) (*models.OperatorMetricsResult, error) {
-	res := &models.OperatorMetricsResult{OperatorID: operatorID}
+func (m *DataManager) GetOperatorMetrics(
+	ctx context.Context,
+	operatorID int64,
+) (*models.OperatorMetricsResult, error) {
+	res := &models.OperatorMetricsResult{
+		OperatorID: operatorID,
+	}
+
+	// AI
+	if operatorID == 0 {
+		const aiResolvedQuery = `
+            SELECT COALESCE(
+                COUNT(*) FILTER (
+                    WHERE target_kind = 'AI_MESSAGE'
+                      AND "like" = true
+                )::float
+                /
+                NULLIF(
+                    COUNT(*) FILTER (
+                        WHERE target_kind = 'AI_MESSAGE'
+                    ),
+                    0
+                ) * 100,
+                0
+            )
+            FROM reactions
+        `
+
+		if err := m.db.QueryRow(
+			ctx,
+			aiResolvedQuery,
+		).Scan(&res.ResolvedSelfPercentage); err != nil {
+			return nil, fmt.Errorf("error AI resolved query: %w", err)
+		}
+
+		return res, nil
+	}
 
 	// 1. Доля дизлайков по реакциям на оператора.
-	const dislikeQuery = `SELECT COALESCE(COUNT(*) FILTER (WHERE "like" = false)::float / NULLIF(COUNT(*),0) * 100,0) FROM reactions WHERE target_kind='OPERATOR' AND operator_id=$1`
-	if err := m.db.QueryRow(ctx, dislikeQuery, operatorID).Scan(&res.DislikePercentage); err != nil {
+	const dislikeQuery = `
+        SELECT COALESCE(
+            COUNT(*) FILTER (WHERE "like" = false)::float
+            / NULLIF(COUNT(*), 0) * 100,
+            0
+        )
+        FROM reactions
+        WHERE target_kind = 'OPERATOR'
+          AND operator_id = $1
+    `
+	if err := m.db.QueryRow(
+		ctx,
+		dislikeQuery,
+		operatorID,
+	).Scan(&res.DislikePercentage); err != nil {
 		return nil, fmt.Errorf("error dislike query: %w", err)
 	}
 
-	// 2. Средний интервал между последовательными сообщениями в тикетах оператора.
-	const avgRespQuery = `WITH intervals AS (
-		SELECT EXTRACT(EPOCH FROM (sent_at - LAG(sent_at) OVER (PARTITION BY claim_id ORDER BY sent_at, id))) AS diff
-		FROM messages
-		WHERE claim_id IN (SELECT id FROM claims WHERE operator_id=$1)
-	) SELECT COALESCE(AVG(diff),0) FROM intervals WHERE diff IS NOT NULL`
-	if err := m.db.QueryRow(ctx, avgRespQuery, operatorID).Scan(&res.AvgResponseTimeSeconds); err != nil {
+	// 2. Средний интервал между сообщениями оператора.
+	const avgRespQuery = `
+        WITH intervals AS (
+            SELECT EXTRACT(
+                EPOCH FROM (
+                    sent_at - LAG(sent_at)
+                    OVER (
+                        PARTITION BY claim_id
+                        ORDER BY sent_at, id
+                    )
+                )
+            ) AS diff
+            FROM messages
+            WHERE claim_id IN (
+                SELECT id
+                FROM claims
+                WHERE operator_id = $1
+            )
+        )
+        SELECT COALESCE(AVG(diff), 0)
+        FROM intervals
+        WHERE diff IS NOT NULL
+    `
+	if err := m.db.QueryRow(
+		ctx,
+		avgRespQuery,
+		operatorID,
+	).Scan(&res.AvgResponseTimeSeconds); err != nil {
 		return nil, fmt.Errorf("error avg response time query: %w", err)
 	}
 
-	// 3. Процент DONE-обращений, где оператор был единственным назначенным исполнителем.
-	const selfResolvedQuery = `SELECT COALESCE(COUNT(*) FILTER (WHERE status='DONE' AND operator_id=$1)::float / NULLIF(COUNT(*),0) * 100,0) FROM claims WHERE operator_id=$1`
-	if err := m.db.QueryRow(ctx, selfResolvedQuery, operatorID).Scan(&res.ResolvedSelfPercentage); err != nil {
+	// 3. Процент самостоятельно решённых обращений оператором.
+	const selfResolvedQuery = `
+        SELECT COALESCE(
+            COUNT(*) FILTER (
+                WHERE status = 'DONE'
+                  AND operator_id = $1
+            )::float
+            /
+            NULLIF(COUNT(*), 0) * 100,
+            0
+        )
+        FROM claims
+        WHERE operator_id = $1
+    `
+	if err := m.db.QueryRow(
+		ctx,
+		selfResolvedQuery,
+		operatorID,
+	).Scan(&res.ResolvedSelfPercentage); err != nil {
 		return nil, fmt.Errorf("error self resolved query: %w", err)
 	}
 
 	// 4. Самая частая причина дизлайка.
-	const topReasonQuery = `SELECT x.reason FROM reactions r CROSS JOIN LATERAL unnest(r.reasons) AS x(reason) WHERE r.target_kind='OPERATOR' AND r.operator_id=$1 AND r."like"=false GROUP BY x.reason ORDER BY COUNT(*) DESC LIMIT 1`
+	const topReasonQuery = `
+        SELECT x.reason
+        FROM reactions r
+        CROSS JOIN LATERAL unnest(r.reasons) AS x(reason)
+        WHERE r.target_kind = 'OPERATOR'
+          AND r.operator_id = $1
+          AND r."like" = false
+        GROUP BY x.reason
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+    `
+
 	var topReason string
-	if err := m.db.QueryRow(ctx, topReasonQuery, operatorID).Scan(&topReason); err == nil {
+	if err := m.db.QueryRow(
+		ctx,
+		topReasonQuery,
+		operatorID,
+	).Scan(&topReason); err == nil {
 		res.TopDislikeReason = topReason
 	} else if err != pgx.ErrNoRows {
 		return nil, fmt.Errorf("error top dislike reason query: %w", err)
 	}
+
 	return res, nil
 }
 
