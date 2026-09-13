@@ -18,13 +18,6 @@ import type {
 // Admins are not part of that chain and are excluded.
 const OPERATOR_ROLES = ['supportL1', 'supportL2', 'supportL3']
 
-// AI is a real row in `users` — id 0, role 'supportL1' (migration
-// 009-add-ai-row.sql) — so it comes back from
-// /analytics/users?roles=supportL1,... like any human operator. It is kept
-// OUT of the human roster/weighted aggregate below (most claims start with
-// AI, so it would dominate by volume) and surfaced separately as `aiOperator`.
-const AI_OPERATOR_ID = 0
-
 // The raw /analytics/claims and /analytics/reactions endpoints have no
 // aggregate/count variant and no explicit server-side max on `limit` — this
 // is a pragmatic single-page fetch used only to derive weighting counts and
@@ -113,38 +106,31 @@ export class ApiClaimsAnalyticsService implements ClaimsAnalyticsService {
       ])
       const name = roster.find((u) => u.id === operatorId)?.name ?? `Оператор #${operatorId}`
       const row: OperatorMetricsRow = { ...metrics, name }
-      const isAi = operatorId === AI_OPERATOR_ID
 
       return {
         operatorAi: {
-          operators: isAi ? [] : [row],
-          aggregate: isAi
-            ? { dislikePercentage: null, avgResponseTimeSeconds: null, resolvedSelfPercentage: null, topDislikeReason: null }
-            : {
-                dislikePercentage: metrics.dislike_percentage,
-                avgResponseTimeSeconds: metrics.avg_response_time_seconds,
-                resolvedSelfPercentage: metrics.resolved_self_percentage,
-                topDislikeReason: metrics.top_dislike_reason ?? null,
-              },
-          aiOperator: isAi ? row : null,
+          operators: [row],
+          aggregate: {
+            dislikePercentage: metrics.dislike_percentage,
+            avgResponseTimeSeconds: metrics.avg_response_time_seconds,
+            resolvedSelfPercentage: metrics.resolved_self_percentage,
+            topDislikeReason: metrics.top_dislike_reason ?? null,
+          },
         },
         topics,
         escalations: sortEscalations(escalations),
       }
     }
 
-    const fullRoster = await fetchOperatorRoster()
-    const roster = fullRoster.filter((u) => u.id !== AI_OPERATOR_ID)
-    const aiUser = fullRoster.find((u) => u.id === AI_OPERATOR_ID) ?? null
+    const roster = await fetchOperatorRoster()
     const operatorIds = roster.map((u) => u.id)
 
-    const [metricsList, claims, reactions, topics, escalations, aiMetrics] = await Promise.all([
+    const [metricsList, claims, reactions, topics, escalations] = await Promise.all([
       mapWithConcurrency(operatorIds, OPERATOR_CONCURRENCY, (id) => fetchOperatorMetrics(id)),
       fetchClaimsForOperators(operatorIds),
       fetchOperatorReactions(operatorIds),
       this.getTopics(),
       fetchEscalations(),
-      aiUser ? fetchOperatorMetrics(AI_OPERATOR_ID) : Promise.resolve(null),
     ])
 
     const nameById = new Map(roster.map((u) => [u.id, u.name]))
@@ -167,11 +153,7 @@ export class ApiClaimsAnalyticsService implements ClaimsAnalyticsService {
     }))
 
     return {
-      operatorAi: {
-        operators,
-        aggregate: computeWeightedAggregate(operators, claims, reactions),
-        aiOperator: aiMetrics && aiUser ? { ...aiMetrics, name: aiUser.name } : null,
-      },
+      operatorAi: { operators, aggregate: computeWeightedAggregate(operators, claims, reactions) },
       topics,
       escalations: sortEscalations(escalations),
     }

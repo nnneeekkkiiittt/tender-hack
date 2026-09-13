@@ -26,4 +26,7 @@ export class ApiEmployeeRepository implements EmployeeRepository {
   async toggleStatus(): Promise<SupportEmployee> {
     throw new Error('Активация и деактивация недоступны')
   }
+  async delete(id: string): Promise<void> {
+    await api<void>('/employees/' + id, 'DELETE')
+  }
 }

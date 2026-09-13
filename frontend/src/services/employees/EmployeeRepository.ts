@@ -15,4 +15,5 @@ export interface EmployeeRepository {
     patch: Partial<Pick<SupportEmployee, 'name' | 'email' | 'role'>>,
   ): Promise<SupportEmployee>
   toggleStatus(id: string): Promise<SupportEmployee>
+  delete(id: string): Promise<void>
 }
