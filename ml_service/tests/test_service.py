@@ -284,14 +284,18 @@ def test_router_routes_rdik_error_to_l2():
     assert decision.line == SupportLine.L2
 
 
-def test_router_preserves_infrastructure_l3_without_broken_json_mode():
+@pytest.mark.parametrize('question,expected', [
+    ('Портал возвращает ошибку 500 при входе.', 'L2'),
+    ('Упал сервер портала, сервис недоступен всем пользователям.', 'L3'),
+])
+def test_router_preserves_main_policy_without_broken_json_mode(question, expected):
     from app.ml.router import IntentRouter
     router = IntentRouter()
     router.session = Mock()
     router.session.post.return_value.json.return_value = {
         'choices': [{'message': {'content': '{"line":"L3","topic":"Технический инцидент","subtopic":""}'}}]
     }
-    assert router.route('Портал возвращает ошибку 500 при входе.').line == 'L3'
+    assert router.route(question).line == expected
     assert 'response_format' not in router.session.post.call_args.kwargs['json']
 
 

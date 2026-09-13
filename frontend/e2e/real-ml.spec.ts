@@ -85,7 +85,7 @@ test('real local ML: cited answer, shared reactions, staff handoff, automatic L3
 
     const incidentStart = Date.now()
     const incidentResponse = await page.request.post('/api/tickets', {
-      headers, data: { text: 'Портал возвращает ошибку 500 при входе.' }, timeout: 180000,
+      headers, data: { text: 'Упал сервер портала, сервис недоступен всем пользователям.' }, timeout: 180000,
     })
     expect(incidentResponse.status()).toBe(201)
     const incident = await incidentResponse.json()
