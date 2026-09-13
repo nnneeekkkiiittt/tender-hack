@@ -74,9 +74,6 @@ export function UserHomePage() {
         <h1 className="text-center text-[28px] font-semibold tracking-tight text-ink sm:text-[32px]">
           Чем я могу помочь?
         </h1>
-        <p className="mt-2 text-center text-[15px] text-ink-muted">
-          Задайте вопрос о закупках, документах или работе на Портале поставщиков
-        </p>
         {question && (
           <div className="mt-7 animate-fade-in-up whitespace-pre-wrap break-words rounded-lg bg-primary p-4 text-white">
             {question}
@@ -84,7 +81,7 @@ export function UserHomePage() {
         )}
         {busy && (
           <p role="status" className="mt-4 flex items-center justify-center gap-2 text-center text-sm text-ink-muted">
-            <span>AI ищет ответ в инструкциях… На локальной модели это может занять несколько минут.</span>
+            <span>AI ищет ответ в инструкциях… Подождите немного</span>
             <ThinkingDots className="text-primary-light" />
           </p>
         )}
@@ -93,9 +90,17 @@ export function UserHomePage() {
             {error}
           </div>
         )}
-        <div className="mt-7">
-          <ChatInput onSend={handleSend} disabled={busy} autoFocus />
-        </div>
+        {!question && (
+          <div className="mt-7">
+            <ChatInput
+              onSend={handleSend}
+              disabled={busy}
+              placeholder="Задайте вопрос о закупках, документах или работе на Портале поставщиков"
+              ariaLabel="Ваш вопрос"
+              autoFocus
+            />
+          </div>
+        )}
         {!question && (
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {SUGGESTIONS.map(({ text, icon: Icon }) => (
@@ -114,10 +119,8 @@ export function UserHomePage() {
         )}
         <p className="mt-8 text-center text-xs leading-relaxed text-ink-muted">
           Сначала ответит AI. Если ответ не помог, нажмите{' '}
-          <ThumbsDown className="inline h-3.5 w-3.5 align-text-bottom" aria-label="дизлайк" /> или напишите ещё —
-          поддержка L1 продолжит этот же чат.
-          <br />
-          Вся история сохранится.
+          <ThumbsDown className="inline h-3.5 w-3.5 align-text-bottom" aria-label="дизлайк" /> чтобы Вас перевели на
+          оператора.
         </p>
       </div>
     </div>

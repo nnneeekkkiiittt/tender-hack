@@ -7,6 +7,7 @@ interface ChatInputProps {
   onSend: (text: string) => void | boolean | Promise<void | boolean>
   disabled?: boolean
   placeholder?: string
+  ariaLabel?: string
   autoFocus?: boolean
 }
 
@@ -14,6 +15,7 @@ export function ChatInput({
   onSend,
   disabled,
   placeholder = 'Спросите что угодно...',
+  ariaLabel = 'Сообщение',
   autoFocus,
 }: ChatInputProps) {
   const [value, setValue] = useState('')
@@ -65,7 +67,7 @@ export function ChatInput({
       </button>
       <textarea
         ref={textareaRef}
-        aria-label={placeholder === 'Спросите что угодно...' ? 'Ваш вопрос' : 'Сообщение'}
+        aria-label={ariaLabel}
         maxLength={10000}
         rows={1}
         value={value}
