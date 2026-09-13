@@ -46,6 +46,7 @@ func main() {
 
 	mbConfig := metabase.Config{
 		SiteURL:         getEnv("METABASE_URL", ""),
+		PublicURL:       getEnv("METABASE_PUBLIC_URL", ""),
 		APIKey:          getEnv("METABASE_API_KEY", ""),
 		EmbeddingSecret: getEnv("METABASE_EMBEDDING_SECRET", ""),
 		DatabaseID:      getEnvInt("METABASE_DATABASE_ID", 0),

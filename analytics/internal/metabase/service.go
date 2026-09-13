@@ -94,7 +94,11 @@ func (s *Service) SignedEmbedURL(cardID int, ttl time.Duration) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("sign embed token: %w", err)
 	}
-	return strings.TrimRight(s.cfg.SiteURL, "/") + "/embed/question/" + token + "#bordered=false&titled=false", nil
+	publicURL := s.cfg.PublicURL
+	if publicURL == "" {
+		publicURL = s.cfg.SiteURL
+	}
+	return strings.TrimRight(publicURL, "/") + "/embed/question/" + token + "#bordered=false&titled=false", nil
 }
 
 // ProvisionDefaultDashboard creates the first required real dashboard

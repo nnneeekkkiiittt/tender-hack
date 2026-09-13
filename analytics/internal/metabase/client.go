@@ -70,6 +70,11 @@ func (c *Client) CreateCard(ctx context.Context, req CardRequest) (int, error) {
 	if err := c.do(ctx, http.MethodPost, "/api/card", req, &resp); err != nil {
 		return 0, err
 	}
+	// Static embedding is opt-in for each card, including API-created ones.
+	if err := c.do(ctx, http.MethodPut, fmt.Sprintf("/api/card/%d", resp.ID),
+		map[string]any{"enable_embedding": true, "embedding_params": map[string]any{}}, nil); err != nil {
+		return 0, err
+	}
 	return resp.ID, nil
 }
 
@@ -87,7 +92,16 @@ func (c *Client) CreateDashboard(ctx context.Context, name string) (int, error) 
 // documented POST /api/dashboard/:id/cards endpoint (stable across
 // currently-supported Metabase releases at the time of writing).
 func (c *Client) AddCardToDashboard(ctx context.Context, dashboardID, cardID, row int) error {
-	path := fmt.Sprintf("/api/dashboard/%d/cards", dashboardID)
-	req := AddCardRequest{CardID: cardID, Row: row, Col: 0, SizeX: 6, SizeY: 4}
-	return c.do(ctx, http.MethodPost, path, req, nil)
+	path := fmt.Sprintf("/api/dashboard/%d", dashboardID)
+	var current struct {
+		Dashcards []map[string]any `json:"dashcards"`
+	}
+	if err := c.do(ctx, http.MethodGet, path, nil, &current); err != nil {
+		return err
+	}
+	cards := append(current.Dashcards, map[string]any{
+		"id": -1, "card_id": cardID, "row": row, "col": 0, "size_x": 6, "size_y": 4,
+		"parameter_mappings": []any{}, "series": []any{},
+	})
+	return c.do(ctx, http.MethodPut, path, map[string]any{"dashcards": cards}, nil)
 }

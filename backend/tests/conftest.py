@@ -37,6 +37,7 @@ def env(database_url):
         conn.execute(
             "TRUNCATE auth_sessions, reactions, claim_events, messages, claims, users RESTART IDENTITY CASCADE"
         )
+        conn.execute("INSERT INTO users(id, name, role, hash) OVERRIDING SYSTEM VALUE VALUES (0, 'AI', 'supportL1', 'disabled')")
     app = create_app(
         Settings(
             database_url=database_url,

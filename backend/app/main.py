@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool, PoolTimeout
 from pydantic import ValidationError
 
-from . import auth, demo, demo_seed, tickets
+from . import analytics, auth, demo, demo_seed, tickets
 from .ai import AiService, HttpAiService, MockAiService
 from .config import Settings
 from .db import DB
@@ -164,6 +164,7 @@ def create_app(settings=None, ai_service: AiService | None = None,
 
     app.include_router(demo.router, prefix="/api", tags=["local demo"])
     app.include_router(auth.router, prefix="/api", tags=["accounts"])
+    app.include_router(analytics.router, prefix="/api", tags=["analytics"])
     app.include_router(tickets.router, prefix="/api", tags=["claims"])
     return app
 

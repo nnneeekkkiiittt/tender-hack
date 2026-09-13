@@ -46,6 +46,11 @@ services:
     command: update
 
   backend:
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      moderation:
+        condition: service_healthy
     build: ./backend
     restart: unless-stopped
     environment:
@@ -96,7 +101,7 @@ services:
 
   tei:
     profiles: [ml]
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
+    image: ghcr.io/huggingface/text-embeddings-inference@sha256:e0918e6fc9020c7fcef8733f4191f6bffe2f5be44c1e409658be3244dfaf1231
     restart: unless-stopped
     volumes:
       - tei_data:/data
@@ -189,21 +194,37 @@ services:
       # them, widgets just won't render until these are set (see
       # analytics/README.md for how to obtain each value).
       METABASE_URL: ${METABASE_URL:-}
+      METABASE_PUBLIC_URL: ${METABASE_PUBLIC_URL:-}
       METABASE_API_KEY: ${METABASE_API_KEY:-}
       METABASE_EMBEDDING_SECRET: ${METABASE_EMBEDDING_SECRET:-}
       METABASE_DATABASE_ID: ${METABASE_DATABASE_ID:-}
     ports:
-      - '8080:8080'
+      - '127.0.0.1:8080:8080'
 
   # Metabase is a fully separate service — the frontend never starts it and
   # never talks to Postgres directly; it only calls the analytics backend
   # and Metabase's embed endpoints.
+  metabase-db:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${DB_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-postgres}}
+      PGDATABASE: postgres
+      METABASE_APP_DB_NAME: ${METABASE_APP_DB_NAME:-metabase_app}
+    volumes:
+      - ./scripts/init-metabase-db.sh:/init.sh:ro
+    entrypoint: [sh, /init.sh]
+
   metabase:
     image: metabase/metabase:v0.56.8
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      metabase-db:
+        condition: service_completed_successfully
     environment:
       MB_DB_TYPE: postgres
       MB_DB_HOST: postgres
@@ -240,4 +261,3 @@ volumes:
   tenderhack_postgres_data:
   qdrant_data:
   tei_data:
-

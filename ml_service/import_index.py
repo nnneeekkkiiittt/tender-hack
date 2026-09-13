@@ -3,7 +3,9 @@
 import argparse
 import hashlib
 import json
+import os
 import re
+import time
 import uuid
 from contextlib import closing
 from pathlib import Path
@@ -78,12 +80,7 @@ def import_index(root: Path, url: str, collection: str, tei_url: str = "http://t
             )
         info = client.get_collection(collection)
         if info.config.params.vectors.size != dim:
-            print(f"Пересоздание коллекции '{collection}' под размерность {dim}...", flush=True)
-            client.delete_collection(collection)
-            client.create_collection(
-                collection, vectors_config=models.VectorParams(size=dim, distance=models.Distance.COSINE)
-            )
-            info = client.get_collection(collection)
+            raise ValueError(f"Collection {collection} has incompatible dimensions; use a new collection")
 
         for offset in range(0, len(chunks), 64):
             points = []
