@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowUpRight, ShieldCheck } from 'lucide-react'
 import { api } from '@/api/contracts'
 import { listAssignableEmployees } from '@/services/employees'
 import { ticketRepository } from '@/services/tickets'
@@ -8,7 +7,6 @@ import { invalidateTickets } from '@/services/tickets/cache'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { EscalateModal } from '@/components/tickets/EscalateModal'
 import { TICKET_CATEGORY_LABEL } from '@/lib/utils'
 import type { Ticket, TicketCategory } from '@/types'
 
@@ -16,13 +14,12 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
   const user = useAuthStore((s) => s.user)!
   const cache = useQueryClient()
   const [error, setError] = useState(''),
-    [busy, setBusy] = useState(false),
-    [escalateOpen, setEscalateOpen] = useState(false)
+    [busy, setBusy] = useState(false)
   const [operator, setOperator] = useState(ticket.supportId || '')
   const active = ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS'
   const admin = user.role === 'ADMIN',
     owner = user.id === ticket.userId
-  const tierMatches = user.role === 'SUPPORT' && user.supportLevel === (ticket.handlingLevel ?? 1)
+  const tierMatches = user.role === 'SUPPORT' && user.supportLevel === ticket.handlingLevel
   const assigned = tierMatches && user.id === ticket.supportId
   const human = (ticket.handlingLevel ?? 1) > 0
   const employees = useQuery({
@@ -34,35 +31,9 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
     setBusy(true)
     setError('')
     try {
-      if (path === '/escalate') await ticketRepository.escalate(ticket.id, ticket.handlingLevel ?? 1)
+      if (path === '/escalate') await ticketRepository.escalate(ticket.id, ticket.handlingLevel!)
       else await api('/tickets/' + ticket.id + path, 'PATCH', body)
       await invalidateTickets(cache, ticket.id)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-  const handleEscalate = async (comment?: string) => {
-    setBusy(true)
-    setError('')
-    try {
-      const currentLvl = ticket.handlingLevel ?? 1
-      if (comment?.trim()) {
-        await ticketRepository.sendMessage({
-          ticketId: ticket.id,
-          authorId: user.id,
-          authorName: user.name,
-          authorRole: 'SUPPORT',
-          content: `[Передача на L${currentLvl + 1}]: ${comment.trim()}`,
-        })
-      }
-      if (!ticket.supportId) {
-        await ticketRepository.assign(ticket.id, user.id, user.name)
-      }
-      await ticketRepository.escalate(ticket.id, currentLvl)
-      await invalidateTickets(cache, ticket.id)
-      setEscalateOpen(false)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -76,11 +47,6 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
         {human && active && !ticket.supportId ? ' · Ожидает сотрудника' : ''}
       </p>
       {!active && <p className="text-ink-muted">Обращение закрыто. История доступна для чтения.</p>}
-      {active && user.role === 'SUPPORT' && user.supportLevel !== ticket.handlingLevel && (
-        <p className="rounded-md bg-gray-50 p-2.5 text-xs text-ink-muted border border-border">
-          Обращение находится на уровне L{ticket.handlingLevel}. Доступно только для чтения.
-        </p>
-      )}
       {active && owner && (
         <Button
           variant="outline"
@@ -158,34 +124,16 @@ export function TicketActions({ ticket }: { ticket: Ticket }) {
           Отметить решённым
         </Button>
       )}
-      {active && tierMatches && (ticket.supportId === user.id || !ticket.supportId) && (ticket.handlingLevel ?? 1) < 3 && (
-        <>
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full gap-1.5 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary-dark"
-            loading={busy}
-            onClick={() => setEscalateOpen(true)}
-          >
-            <ArrowUpRight className="h-4 w-4" />
-            {(ticket.handlingLevel ?? 1) === 1 ? 'Передать на 2-ю линию (L2)' : 'Передать на 3-ю линию (L3)'}
-          </Button>
-          <EscalateModal
-            open={escalateOpen}
-            onClose={() => setEscalateOpen(false)}
-            onConfirm={handleEscalate}
-            currentLevel={ticket.handlingLevel ?? 1}
-            targetLevel={(ticket.handlingLevel ?? 1) + 1}
-            ticketNumber={ticket.number}
-            busy={busy}
-          />
-        </>
-      )}
-      {active && tierMatches && (ticket.handlingLevel ?? 1) === 3 && (
-        <div className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-gray-50/80 px-3 py-2 text-xs text-ink-muted">
-          <ShieldCheck className="h-3.5 w-3.5 text-secondary" />
-          <span>Финальная линия поддержки (L3)</span>
-        </div>
+      {active && assigned && ticket.handlingLevel! < 3 && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full"
+          loading={busy}
+          onClick={() => void run('/escalate', {})}
+        >
+          Эскалировать
+        </Button>
       )}
       {error && (
         <p role="alert" className="text-accent">

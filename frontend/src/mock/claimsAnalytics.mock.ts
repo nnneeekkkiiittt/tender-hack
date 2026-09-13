@@ -17,6 +17,19 @@ const DEMO_OPERATORS: OperatorMetricsRow[] = [
   { operator_id: 4, name: 'Алексей Новиков', dislike_percentage: 7.7, avg_response_time_seconds: 228, resolved_self_percentage: 74.0, top_dislike_reason: 'IRRELEVANT ANSWER' },
 ]
 
+// AI is a real row in `users` (id 0) since migration 009-add-ai-row.sql —
+// mirrored here for demo/API parity. Intentionally NOT part of
+// DEMO_OPERATORS/weightedAggregate — see AI_OPERATOR_ID in
+// ApiClaimsAnalyticsService for why it's kept separate.
+const DEMO_AI_OPERATOR: OperatorMetricsRow = {
+  operator_id: 0,
+  name: 'AI',
+  dislike_percentage: 11.2,
+  avg_response_time_seconds: 14,
+  resolved_self_percentage: 69.4,
+  top_dislike_reason: 'INCORRECT ANSWER',
+}
+
 // Weighted by a plausible claims-handled count per operator — mirrors how
 // ApiClaimsAnalyticsService weights the real aggregate (see its comments).
 const DEMO_WEIGHTS = [184, 167, 203, 176]
@@ -61,6 +74,18 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 export async function getDemoClaimsAnalytics(operatorId?: number): Promise<ClaimsAnalyticsData> {
   await wait(300)
 
+  if (operatorId === DEMO_AI_OPERATOR.operator_id) {
+    return {
+      operatorAi: {
+        operators: [],
+        aggregate: { dislikePercentage: null, avgResponseTimeSeconds: null, resolvedSelfPercentage: null, topDislikeReason: null },
+        aiOperator: DEMO_AI_OPERATOR,
+      },
+      topics: { topics: DEMO_TOPICS, truncated: false, totalTopicsFound: DEMO_TOPICS.length },
+      escalations: DEMO_ESCALATIONS,
+    }
+  }
+
   if (operatorId) {
     const single = DEMO_OPERATORS.find((o) => o.operator_id === operatorId)
     return {
@@ -74,6 +99,7 @@ export async function getDemoClaimsAnalytics(operatorId?: number): Promise<Claim
               topDislikeReason: single.top_dislike_reason ?? null,
             }
           : { dislikePercentage: null, avgResponseTimeSeconds: null, resolvedSelfPercentage: null, topDislikeReason: null },
+        aiOperator: null,
       },
       topics: { topics: DEMO_TOPICS, truncated: false, totalTopicsFound: DEMO_TOPICS.length },
       escalations: DEMO_ESCALATIONS,
@@ -81,7 +107,7 @@ export async function getDemoClaimsAnalytics(operatorId?: number): Promise<Claim
   }
 
   return {
-    operatorAi: { operators: DEMO_OPERATORS, aggregate: weightedAggregate() },
+    operatorAi: { operators: DEMO_OPERATORS, aggregate: weightedAggregate(), aiOperator: DEMO_AI_OPERATOR },
     topics: { topics: DEMO_TOPICS, truncated: false, totalTopicsFound: DEMO_TOPICS.length },
     escalations: DEMO_ESCALATIONS,
   }

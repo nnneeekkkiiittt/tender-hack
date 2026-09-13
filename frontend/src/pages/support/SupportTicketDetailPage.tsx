@@ -5,8 +5,8 @@ import { invalidateTickets } from '@/services/tickets/cache'
 import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Sparkles, Paperclip, Lightbulb, ArrowUpRight, ShieldCheck } from 'lucide-react'
-import { EscalateModal } from '@/components/tickets/EscalateModal'
+// (single react-query import; second call below reuses the same hook)
+import { ArrowLeft, Sparkles, Paperclip, Lightbulb } from 'lucide-react'
 import { TicketStatusBadge } from '@/components/tickets/TicketStatusBadge'
 import { PriorityBadge } from '@/components/tickets/PriorityBadge'
 import { LoadingState } from '@/components/ui/LoadingState'
@@ -48,8 +48,6 @@ export function SupportTicketDetailPage() {
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [escalateOpen, setEscalateOpen] = useState(false)
-  const [escalating, setEscalating] = useState(false)
 
   const {
     data: ticket,
@@ -119,46 +117,6 @@ export function SupportTicketDetailPage() {
   const hasAiMessage = ticket.messages.some((m) => m.isAiAnalysis)
   const mlContext = ticket.messages.find((m) => m.mlContext)?.mlContext
 
-  const currentHandlingLevel = ticket.handlingLevel ?? 1
-  const active = ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS'
-  const isSupport = user?.role === 'SUPPORT'
-  const isAdmin = user?.role === 'ADMIN'
-  const tierMatches = isSupport && user?.supportLevel === currentHandlingLevel
-  const canEscalate =
-    active &&
-    (tierMatches || isAdmin) &&
-    currentHandlingLevel < 3 &&
-    (!ticket.supportId || ticket.supportId === user?.id || isAdmin)
-  const isTerminalL3 = active && currentHandlingLevel === 3 && (tierMatches || isAdmin)
-  const nextLevel = currentHandlingLevel + 1
-
-  const handleEscalate = async (comment?: string) => {
-    if (!ticket || !user) return
-    setEscalating(true)
-    setError('')
-    try {
-      if (comment?.trim()) {
-        await ticketRepository.sendMessage({
-          ticketId: ticket.id,
-          authorId: user.id,
-          authorName: user.name,
-          authorRole: user.role === 'ADMIN' ? 'ADMIN' : 'SUPPORT',
-          content: `[Передача на L${nextLevel}]: ${comment.trim()}`,
-        })
-      }
-      if (!ticket.supportId) {
-        await ticketRepository.assign(ticket.id, user.id, user.name)
-      }
-      await ticketRepository.escalate(ticket.id, currentHandlingLevel)
-      await invalidate()
-      setEscalateOpen(false)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setEscalating(false)
-    }
-  }
-
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <Link
@@ -182,70 +140,8 @@ export function SupportTicketDetailPage() {
         </p>
       )}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-        <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-white shadow-xs">
-          {/* Chat Header Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-gray-50/80 px-5 py-3">
-            <div className="flex items-center gap-3">
-              <Avatar name={ticket.userName} size="sm" tone="primary" />
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-ink">
-                    {ticket.userName}
-                  </span>
-                  {ticket.userOrganization && (
-                    <span className="hidden text-xs text-ink-muted sm:inline">
-                      ({ticket.userOrganization})
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-ink-muted">
-                  <span className="inline-flex items-center gap-1.5 font-medium text-emerald-600">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Чат с пользователем
-                  </span>
-                  <span>·</span>
-                  <span className="font-medium text-primary">
-                    {currentHandlingLevel > 0 ? `Линия L${currentHandlingLevel}` : 'AI'}
-                  </span>
-                  {active && !ticket.supportId && currentHandlingLevel > 0 && (
-                    <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-                      Не назначен
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Operator Escalation Button in chat */}
-            <div className="flex items-center gap-2">
-              {canEscalate && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary-dark font-medium shadow-xs"
-                  loading={escalating}
-                  onClick={() => setEscalateOpen(true)}
-                  title={`Передать диалог оператору L${nextLevel}`}
-                >
-                  <ArrowUpRight className="h-4 w-4" />
-                  {currentHandlingLevel === 1 ? 'Передать на 2-ю линию (L2)' : 'Передать на 3-ю линию (L3)'}
-                </Button>
-              )}
-              {isTerminalL3 && (
-                <div className="flex items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1.5 text-xs font-medium text-ink-muted shadow-xs">
-                  <ShieldCheck className="h-3.5 w-3.5 text-secondary" />
-                  <span>Финальная линия (L3)</span>
-                </div>
-              )}
-              {active && isSupport && user?.supportLevel !== currentHandlingLevel && (
-                <span className="rounded-md border border-border bg-gray-100 px-2.5 py-1 text-xs text-ink-muted">
-                  Только чтение (L{currentHandlingLevel})
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col gap-5 p-5">
+        <div className="rounded-lg border border-border bg-white">
+          <div className="flex flex-col gap-5 p-5">
             {!isDemoMode && <OlderMessages ticket={ticket} />}
             {ticket.messages.map((message) => {
               const isAi = message.authorRole === 'AI'
@@ -326,25 +222,10 @@ export function SupportTicketDetailPage() {
 
           {(isDemoMode
             ? ticket.status !== 'CLOSED'
-            : active &&
+            : (ticket.status === 'OPEN' || ticket.status === 'IN_PROGRESS') &&
               (!ticket.supportId || ticket.supportId === user?.id) &&
-              (isDemoMode || user?.supportLevel === currentHandlingLevel)) && (
-            <div className="border-t border-border bg-gray-50/40 p-4">
-              {canEscalate && (
-                <div className="mb-2.5 flex items-center justify-between text-xs">
-                  <span className="text-ink-muted">
-                    Сложный вопрос? Можно передать диалог на следующий уровень:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setEscalateOpen(true)}
-                    className="inline-flex items-center gap-1 font-medium text-primary hover:text-primary-dark hover:underline"
-                  >
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                    {currentHandlingLevel === 1 ? 'Передать на L2' : 'Передать на L3'}
-                  </button>
-                </div>
-              )}
+              (isDemoMode || user?.supportLevel === ticket.handlingLevel)) && (
+            <div className="border-t border-border p-4">
               <ChatInput
                 onSend={handleSend}
                 disabled={sending}
@@ -463,18 +344,6 @@ export function SupportTicketDetailPage() {
           <LoadingState compact label="Загрузка профиля..." />
         )}
       </Modal>
-
-      {canEscalate && (
-        <EscalateModal
-          open={escalateOpen}
-          onClose={() => setEscalateOpen(false)}
-          onConfirm={handleEscalate}
-          currentLevel={currentHandlingLevel}
-          targetLevel={nextLevel}
-          ticketNumber={ticket.number}
-          busy={escalating}
-        />
-      )}
     </div>
   )
 }

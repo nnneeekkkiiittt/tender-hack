@@ -90,7 +90,8 @@ export function UserHomePage() {
             {error}
           </div>
         )}
-          <div className={question ? 'hidden' : 'mt-7'}>
+        {!question && (
+          <div className="mt-7">
             <ChatInput
               onSend={handleSend}
               disabled={busy}
@@ -99,6 +100,7 @@ export function UserHomePage() {
               autoFocus
             />
           </div>
+        )}
         {!question && (
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {SUGGESTIONS.map(({ text, icon: Icon }) => (

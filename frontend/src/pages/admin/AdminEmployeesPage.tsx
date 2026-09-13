@@ -3,7 +3,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { PasswordModal } from '@/components/accounts/PasswordModal'
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { UserCog, Plus, Pencil, UserX, UserCheck, Trash2 } from 'lucide-react'
+import { UserCog, Plus, Pencil, UserX, UserCheck } from 'lucide-react'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -32,9 +32,6 @@ export function AdminEmployeesPage() {
     [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<SupportEmployee | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<SupportEmployee | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -98,21 +95,6 @@ export function AdminEmployeesPage() {
   const handleToggleStatus = async (id: string) => {
     await employeeRepository.toggleStatus(id)
     await invalidate()
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setDeleting(true)
-    setDeleteError('')
-    try {
-      await employeeRepository.delete(deleteTarget.id)
-      await invalidate()
-      setDeleteTarget(null)
-    } catch (e) {
-      setDeleteError((e as Error).message || 'Не удалось удалить сотрудника')
-    } finally {
-      setDeleting(false)
-    }
   }
 
   const employees = page?.items
@@ -214,17 +196,6 @@ export function AdminEmployeesPage() {
                             )}
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            setDeleteError('')
-                            setDeleteTarget(e)
-                          }}
-                          className="rounded-md p-1.5 text-ink-muted hover:bg-red-50 hover:text-red-600 transition-colors"
-                          aria-label={`Удалить ${e.name}`}
-                          title="Удалить сотрудника"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -305,48 +276,6 @@ export function AdminEmployeesPage() {
               )}
             </select>
           </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={!!deleteTarget}
-        onClose={() => {
-          if (!deleting) setDeleteTarget(null)
-        }}
-        title="Удаление сотрудника"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteTarget(null)}
-              disabled={deleting}
-            >
-              Отмена
-            </Button>
-            <Button
-              variant="danger"
-              onClick={handleDelete}
-              loading={deleting}
-            >
-              Удалить
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          {deleteError && (
-            <p role="alert" className="text-sm font-medium text-accent">
-              {deleteError}
-            </p>
-          )}
-          <p className="text-sm text-ink">
-            Вы действительно хотите удалить сотрудника{' '}
-            <span className="font-semibold text-ink">{deleteTarget?.name}</span> (
-            {deleteTarget ? ROLE_LABEL[deleteTarget.role] : ''})?
-          </p>
-          <p className="text-xs text-ink-muted">
-            Сотрудник потеряет доступ к системе и будет удален из списка назначения обращений.
-          </p>
         </div>
       </Modal>
     </div>

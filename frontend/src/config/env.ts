@@ -9,7 +9,7 @@ export const API_URL: string = import.meta.env.VITE_API_URL || '/api'
 // which points at the main backend. Base URL only (no path); each analytics
 // endpoint call appends /api/v1/... itself (see api/analyticsClient.ts).
 export const ANALYTICS_API_URL: string =
-  import.meta.env.VITE_ANALYTICS_API_URL || ''
+  import.meta.env.VITE_ANALYTICS_API_URL || 'http://localhost:8080'
 
 // Metabase base URL for embedded dashboards. No API key / embedding secret
 // ever lives here — those stay backend-side (see analytics/internal/metabase).

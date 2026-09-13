@@ -87,7 +87,6 @@ export function DashboardBuilderPage() {
     try {
       const payload = { name, description, widgets }
       const saved = isEditing ? await dashboardRepository.update(id!, payload) : await dashboardRepository.create(payload)
-      queryClient.setQueryData(['dashboard', saved.id], saved)
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       navigate(`/admin/analytics/dashboards/${saved.id}`)
     } catch {
