@@ -263,3 +263,44 @@ def test_clean_text_removes_figures_and_markdown():
     assert "Рисунок" not in cleaned
     assert "(3)" not in cleaned
     assert cleaned.endswith(".")
+
+
+def test_router_routes_rdik_error_to_l2():
+    from app.ml.router import IntentRouter
+    from app.ml.schemas import SupportLine
+
+    router = IntentRouter()
+    router.session = Mock()
+    mock_resp = Mock()
+    # Модель ошибочно пытается вернуть L1
+    mock_resp.json.return_value = {
+        "choices": [{"message": {"content": '{"line": "L1", "topic": "Электронное исполнение (ЕИС)", "subtopic": "Формирование УПД (вопросы по ошибкам РДИК)"}'}}]
+    }
+    mock_resp.raise_for_status = Mock()
+    router.session.post.return_value = mock_resp
+
+    decision = router.route("ошибка РДИК_0217")
+    # Должно быть перенаправлено на L2, так как это ошибка интеграции/РДИК
+    assert decision.line == SupportLine.L2
+
+
+def test_generator_returns_exact_action_for_rdik_without_llm():
+    from app.ml.generator import AnswerGenerator
+
+    gen = AnswerGenerator()
+    chunk = RetrievedChunk(
+        text="3) При возникновении ошибок: • РДИК_0217, – требуется нажать на кнопку «Обновить данные из контракта ЕИС» (Рисунок 65).",
+        doc_name="Инструкция",
+        page=67,
+    )
+    # Вызываем генератор: точное действие должно вернуться сразу без вызова LLM
+    answer = gen.generate("ошибка РДИК_0217", [chunk])
+    assert answer == "При возникновении ошибки РДИК_0217 требуется нажать на кнопку «Обновить данные из контракта ЕИС»."
+
+
+def test_retriever_expand_query_preserves_error_code():
+    retriever = KBRetriever.__new__(KBRetriever)
+    queries = retriever.expand_query("ошибка РДИК_0217")
+    assert "ошибка РДИК_0217" in queries
+    assert any("0217" in q for q in queries)
+

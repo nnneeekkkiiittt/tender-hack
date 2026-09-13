@@ -305,17 +305,20 @@ class IntentRouter:
                 logger.warning(f"Неизвестная линия поддержки '{raw_line}', fallback на L1")
                 line_enum = SupportLine.L1
 
-            # Защита от ложного L3: ошибки РДИК, оферт, ЭЦП, валидации — всегда L2
+            # Защита от ложной классификации: ошибки РДИК, оферт, ЭЦП, валидации — всегда L2
             q_lower = query.lower()
-            if line_enum == SupportLine.L3 and (
+            if (
                 "рдик" in q_lower
-                or "оферт" in q_lower
-                or "сте" in q_lower
-                or "эцп" in q_lower
-                or "подпис" in q_lower
-                or "документ" in q_lower
+                or ("ошибк" in q_lower and any(c.isdigit() for c in q_lower))
+                or (line_enum == SupportLine.L3 and (
+                    "оферт" in q_lower
+                    or "сте" in q_lower
+                    or "эцп" in q_lower
+                    or "подпис" in q_lower
+                    or "документ" in q_lower
+                ))
             ):
-                logger.info(f"Запрос '{query}' перенаправлен с L3 на L2 (ошибка бизнес-логики/портала)")
+                logger.info(f"Запрос '{query}' перенаправлен на L2 (ошибка бизнес-логики/портала)")
                 line_enum = SupportLine.L2
 
             needs_rag = line_enum in (SupportLine.L1, SupportLine.L2)

@@ -9,7 +9,9 @@
 
 import json
 import logging
+import os
 import re
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 import requests
 
@@ -37,28 +39,6 @@ except ImportError:
     QdrantClient = None
 
 
-QUERY_EXPANDER_SYSTEM_PROMPT = """Ты — эксперт по информационному поиску в регламентах и нормативных документах системы электронных торгов и госзакупок (Портал поставщиков Москвы).
-
-Пользователь задал вопрос в службу поддержки (часто на разговорном или обобщенном языке).
-Твоя задача — сформулировать 2 точных поисковых запроса в строгих терминах официальных регламентов, ГОСТов, документации АРМ и законов о закупках (44-ФЗ, 223-ФЗ).
-
-ПРИМЕРЫ:
-- Вопрос: "какие документы нужны?"
-  Ответ: ["перечень документов и требования для регистрации поставщика на портале", "документы для участия в котировочной сессии и подачи ценового предложения"]
-- Вопрос: "как принять участие в закупке?"
-  Ответ: ["порядок участия в котировочной сессии и закупке по потребности", "подача ценового предложения оферты поставщиком"]
-- Вопрос: "как работает электронная подпись?"
-  Ответ: ["настройка квалифицированной электронной цифровой подписи ЭЦП КриптоПро CSP", "подписание оферты и контракта электронной подписью"]
-- Вопрос: "где посмотреть результаты?"
-  Ответ: ["просмотр итогов котировочной сессии протокол подведения итогов", "статус закупки и реестр заключенных контрактов"]
-- Вопрос: "почему не подписывается оферта в браузере?"
-  Ответ: ["ошибка подписания оферты электронная цифровая подпись ЭЦП", "требования к плагину КриптоПро ЭЦП Browser plug-in"]
-- Вопрос: "какая винда нужна?"
-  Ответ: ["системные требования к операционной системе АРМ Windows", "минимальные требования к программному обеспечению"]
-
-ОТВЕТ ДОЛЖЕН БЫТЬ СТРОГО В ФОРМАТЕ JSON:
-{"queries": ["запрос 1", "запрос 2"]}
-Не пиши никаких пояснений, только валидный JSON!"""
 
 CANONICAL_SUGGESTION_EXPANSIONS: Dict[str, List[str]] = {
     "какие документы": [
@@ -120,7 +100,7 @@ class KBRetriever:
                 self.client = QdrantClient(
                     url=self.qdrant_url,
                     api_key=settings.QDRANT_API_KEY or None,
-                    timeout=5,
+                    timeout=30,
                     prefer_grpc=False,
                     check_compatibility=False,
                 )
@@ -129,54 +109,32 @@ class KBRetriever:
 
         self.reranker = CrossEncoderReranker()
 
-    def _get_vllm_headers(self) -> Dict[str, str]:
-        headers = {"Content-Type": "application/json"}
-        if settings.VLLM_API_KEY and settings.VLLM_API_KEY != "EMPTY":
-            headers["Authorization"] = f"Bearer {settings.VLLM_API_KEY}"
-        return headers
-
     def expand_query(self, user_query: str) -> List[str]:
         """
-        Перефразирует и расширяет пользовательский запрос в терминологию регламентов.
-        В случае сбоя или оффлайна LLM возвращает исходный запрос.
+        Формирует поисковые запросы на основе кодов ошибок и канонических правил.
+        Работает детерминированно и мгновенно (0ms), не нагружая малую LLM модельку.
         """
         queries = [user_query]
         q_norm = user_query.lower().strip("?!., \t")
 
+        # Если в запросе указан конкретный код ошибки (РДИК_..., DIT_... и т.д.), не размываем его
+        code_candidates = re.findall(r"[а-яА-ЯёЁa-zA-Z0-9_-]+_\d+", user_query)
+        if code_candidates or "рдик" in q_norm:
+            for c in code_candidates:
+                if c not in queries:
+                    queries.append(c)
+                digits = re.findall(r"\d+", c)
+                if digits and digits[0] not in queries:
+                    queries.append(digits[0])
+            return queries
+
+        # Проверяем канонические расширения по ключевым фразам
         for trigger, expansions in CANONICAL_SUGGESTION_EXPANSIONS.items():
             if trigger in q_norm:
                 for exp in expansions:
                     if exp not in queries:
                         queries.append(exp)
                 break
-
-        if len(queries) >= 3:
-            return queries
-
-        payload = {
-            "model": settings.MODEL_NAME,
-            "messages": [
-                {"role": "system", "content": QUERY_EXPANDER_SYSTEM_PROMPT},
-                {"role": "user", "content": f"Вопрос пользователя: {user_query}"},
-            ],
-            "temperature": 0.0,
-            "max_tokens": 150,
-            "response_format": {"type": "json_object"},
-        }
-
-        try:
-            url = f"{self.vllm_base_url}/chat/completions"
-            res = self.session.post(url, json=payload, headers=self._get_vllm_headers(), timeout=60)
-            if res.status_code == 200:
-                content = res.json()["choices"][0]["message"]["content"].strip()
-                data = json.loads(content)
-                expanded = data.get("queries", [])
-                for q in expanded[:2]:
-                    clean_q = str(q).strip()
-                    if clean_q and clean_q not in queries:
-                        queries.append(clean_q)
-        except Exception as e:
-            logger.debug(f"Query expansion пропущен (работаем по исходному запросу): {e}")
 
         return queries
 
@@ -195,8 +153,54 @@ class KBRetriever:
 
     def _load_cache_if_needed(self, collection_name: str) -> None:
         """Предзагружает текстовые пейлоады коллекции в память для мгновенного точного поиска."""
-        if hasattr(self, "_cached_collection") and self._cached_collection == collection_name and hasattr(self, "_cached_chunks") and self._cached_chunks:
+        if hasattr(self, "_cached_collection") and self._cached_collection == collection_name and getattr(self, "_cached_chunks", None):
             return
+
+        # 1. Сначала пробуем загрузить напрямую из локального файла индекса (без сети и таймаутов)
+        kb_candidates = [
+            os.getenv("KB_PATH"),
+            "/knowledge/dense_kb_v1",
+            "/knowledge",
+            "./knowledge/dense_kb_v1",
+            "./.demo/knowledge/dense_kb_v1",
+        ]
+        for kb_dir in kb_candidates:
+            if not kb_dir:
+                continue
+            path = Path(kb_dir)
+            target = path / "chunks.jsonl" if (path / "chunks.jsonl").exists() else path / "dense_kb_v1" / "chunks.jsonl"
+            if target.exists():
+                try:
+                    cached = []
+                    for line in target.read_text(encoding="utf-8").splitlines():
+                        if not line.strip():
+                            continue
+                        item = json.loads(line)
+                        text = item.get("text") or item.get("page_content", "")
+                        if not text:
+                            continue
+                        headings = item.get("heading_path", [])
+                        breadcrumb = " > ".join(headings) if isinstance(headings, list) else (item.get("breadcrumb") or "")
+                        chunk = RetrievedChunk(
+                            text=text,
+                            doc_name=item.get("file") or item.get("doc_name", "Регламент"),
+                            breadcrumb=breadcrumb,
+                            page=item.get("page_start") or item.get("page"),
+                            page_end=item.get("page_end"),
+                            edition=None,
+                            score=1.0,
+                            support_line="L2",
+                        )
+                        cached.append((chunk, text.lower(), breadcrumb.lower()))
+                    if cached:
+                        self._cached_chunks = cached
+                        self._cached_collection = collection_name
+                        logger.info(f"Загружено {len(cached)} чанков из локального индекса {target}")
+                        return
+                except Exception as e:
+                    logger.warning(f"Не удалось прочитать {target}: {e}")
+
+        # 2. Фолбэк: scroll через Qdrant Client с достаточным таймаутом
         client = getattr(self, "client", None)
         if client is None or not hasattr(client, "scroll"):
             return
@@ -224,12 +228,14 @@ class KBRetriever:
                     support_line=payload.get("support_line", "L2"),
                 )
                 cached.append((chunk, text.lower(), (payload.get("breadcrumb") or "").lower()))
-            self._cached_chunks = cached
-            self._cached_collection = collection_name
-            logger.info(f"Загружено {len(cached)} чанков в кэш поиска для коллекции '{collection_name}'")
+            if cached:
+                self._cached_chunks = cached
+                self._cached_collection = collection_name
+                logger.info(f"Загружено {len(cached)} чанков в кэш поиска для коллекции '{collection_name}' из Qdrant")
         except Exception as e:
             logger.warning(f"Не удалось предзагрузить чанки коллекции '{collection_name}': {e}")
-            self._cached_chunks = []
+            if not getattr(self, "_cached_chunks", None):
+                self._cached_chunks = []
 
     def _search_keyword_matches(self, query: str, collection_name: str) -> List[RetrievedChunk]:
         """Быстрый поиск по точным кодам ошибок, номерам статей и ключевым терминам."""
@@ -340,7 +346,7 @@ class KBRetriever:
             query_vectors = self.embed_queries_batch(search_queries)
 
             # 5. Выполняем поиск по каждому вектору в Qdrant
-            effective_search_threshold = max(0.35, min(self.score_threshold, 0.70) - 0.1)
+            effective_search_threshold = max(0.30, min(self.score_threshold, 0.70) - 0.20)
             for q_idx, vector in enumerate(query_vectors):
                 if hasattr(self.client, "query_points"):
                     res = self.client.query_points(
@@ -408,7 +414,7 @@ class KBRetriever:
             )
 
             # Этап 1: Отбор кандидатов по адаптивному порогу релевантности
-            effective_threshold = min(self.score_threshold, 0.70)
+            effective_threshold = max(0.40, min(self.score_threshold, 0.60))
             candidate_chunks: List[RetrievedChunk] = []
             for item in ranked_items[:max(12, k * 3)]:
                 if item.get("is_keyword_match") or item["max_score"] >= effective_threshold:

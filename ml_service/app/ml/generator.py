@@ -159,8 +159,11 @@ class AnswerGenerator:
         self, query: str, chunks: List[RetrievedChunk], history: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """Синхронная генерация ответа на запрос с защитой от деградации."""
-        # Для запросов с точными кодами ошибок проверяем прямое извлечение регламентного действия
+        # Для запросов с точными кодами ошибок возвращаем прямое регламентное действие
         extracted_action = extract_action_for_error(query, chunks)
+        if extracted_action and (re.findall(r"[а-яА-ЯёЁa-zA-Z0-9_-]+_\d+", query) or "рдик" in query.lower()):
+            logger.info(f"Найдено прямое регламентное действие для {query}: {extracted_action}")
+            return clean_text(extracted_action)
 
         messages = self._prepare_messages(query, chunks, history)
         payload = {
@@ -197,7 +200,7 @@ class AnswerGenerator:
                 return clean_text(extracted_action) if extracted_action else "[NO_CONTEXT]"
 
             if raw_content == "[NO_CONTEXT]":
-                return "[NO_CONTEXT]"
+                return clean_text(extracted_action) if extracted_action else "[NO_CONTEXT]"
 
             return clean_text(raw_content)
         except Exception as e:
